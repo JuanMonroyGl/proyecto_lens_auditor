@@ -64,6 +64,27 @@ C:\Users\TuUsuario\Desktop\mi-proyecto
 
 Despues de escanear, usa el boton `Ver mapa visual` para abrir el mapa jerarquico del proyecto. En esa vista puedes enfocar carpetas o archivos, buscar rutas, expandir/colapsar el recorrido y volver al dashboard con `Volver`.
 
+## Gemini Advisor
+
+Project Lens puede generar recomendaciones con Gemini 2.5 Pro sin enviar contenido fuente largo. El backend envia metadata del scan: rutas, capas, conteos, scores, relaciones e imports resumidos.
+
+1. Copia el ejemplo de entorno:
+
+```powershell
+Copy-Item server\.env.example server\.env
+```
+
+2. Edita `server/.env`:
+
+```text
+GEMINI_API_KEY=tu_api_key
+GEMINI_MODEL=gemini-2.5-pro
+```
+
+3. Reinicia el servidor y usa la pestaña `Recomendaciones`.
+
+El contador muestra tokens de entrada, salida, total y costo estimado en USD. Para `gemini-2.5-pro` usa precios Standard de Google AI: prompts de hasta 200k tokens calculan entrada a 1.25 USD / 1M y salida a 10 USD / 1M; prompts mayores calculan entrada a 2.50 USD / 1M y salida a 15 USD / 1M.
+
 ## Ejecutar servidor y cliente por separado
 
 Terminal 1:

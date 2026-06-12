@@ -1,9 +1,13 @@
 import cors from "cors";
 import express from "express";
+import { buildAiRecommendations } from "./geminiAdvisor.js";
 import { compareVersionPair, getGitVersions } from "./gitVersions.js";
 import { scanProject } from "./scanner.js";
 import { loadProjectLensConfig, saveProjectLensConfig } from "./config.js";
 import { compareSnapshotPair, listSnapshots, saveSnapshot } from "./snapshots.js";
+import { loadServerEnv } from "./env.js";
+
+loadServerEnv();
 
 const app = express();
 const port = Number(process.env.PORT || 3333);
@@ -165,6 +169,29 @@ app.post("/api/versions/compare", async (req, res) => {
   } catch (error) {
     res.status(400).json({
       error: error instanceof Error ? error.message : "No fue posible comparar versiones."
+    });
+  }
+});
+
+app.post("/api/ai/recommendations", async (req, res) => {
+  const scan = req.body?.scan;
+
+  if (!scan || typeof scan !== "object") {
+    res.status(400).json({ error: "scan es requerido." });
+    return;
+  }
+
+  try {
+    res.json({
+      advice: await buildAiRecommendations({
+        scan,
+        targetArchitecture:
+          typeof req.body?.targetArchitecture === "string" ? req.body.targetArchitecture.trim() : ""
+      })
+    });
+  } catch (error) {
+    res.status(502).json({
+      error: error instanceof Error ? error.message : "No fue posible generar recomendaciones con IA."
     });
   }
 });

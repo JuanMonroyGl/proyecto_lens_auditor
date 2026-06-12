@@ -68,6 +68,8 @@ function buildArchitectureInsights({ dependencies, files, packageManifests, proj
   const keyFiles = buildKeyFiles(files);
   const flow = buildProjectFlow(projectProfile, keyFiles);
   const relations = buildLayerRelations(files, dependencies);
+  const pattern = detectArchitecturePattern({ dependencies, files, layers, projectProfile });
+  const architectureOptions = buildArchitectureOptions({ files, layers, pattern, projectProfile });
   const stackLabels = projectProfile.stack.length > 0 ? projectProfile.stack.join(", ") : "estructura local";
 
   return {
@@ -75,6 +77,9 @@ function buildArchitectureInsights({ dependencies, files, packageManifests, proj
     summary: buildArchitectureSummary({ layers, projectProfile, stackLabels, totals }),
     stack: projectProfile.stack,
     packageManagers: packageManifests.map((manifest) => manifest.relativePath),
+    pattern,
+    recommendedPattern: architectureOptions[0],
+    architectureOptions,
     layers,
     flow,
     keyFiles,
@@ -272,6 +277,179 @@ function buildLayerRelations(files, dependencies) {
       ...item,
       detail: describeRelation(item)
     }));
+}
+
+function detectArchitecturePattern({ dependencies, files, layers, projectProfile }) {
+  const layerLabels = new Set(layers.map((layer) => layer.label));
+  const paths = files.map((file) => file.relativePath.toLowerCase());
+  const hasClientServer = layerLabels.has("UI / Frontend") && layerLabels.has("API Backend");
+  const hasCore = layerLabels.has("Core / Processing") || paths.some((item) => item.includes("core/"));
+  const hasInfrastructure = paths.some((item) =>
+    ["infra", "infrastructure", "repository", "adapter", "gateway", "client"].some((part) => item.includes(part))
+  );
+  const hasDomain = paths.some((item) => item.includes("domain/") || item.includes("entity") || item.includes("model"));
+  const hasUseCases = paths.some((item) => item.includes("usecase") || item.includes("use_case") || item.includes("application/"));
+  const hasTests = layerLabels.has("Tests / Quality");
+  const crossLayerRelations = dependencies.edges?.filter((edge) => {
+    const from = files.find((file) => file.relativePath === edge.from);
+    const to = files.find((file) => file.relativePath === edge.to);
+
+    return from?.fileInsights?.layer && to?.fileInsights?.layer && from.fileInsights.layer !== to.fileInsights.layer;
+  }).length ?? 0;
+  const sourceFiles = files.filter((file) => file.category === "source").length;
+  const highFanOutFiles = files.filter((file) => (file.codeMetrics?.fanOut ?? 0) >= 8).length;
+  const evidence = [];
+
+  if (hasClientServer) {
+    evidence.push("Se detectan capas separadas de UI / Frontend y API Backend.");
+  }
+
+  if (hasCore || hasUseCases) {
+    evidence.push("Hay senales de procesamiento central o casos de aplicacion.");
+  }
+
+  if (hasInfrastructure) {
+    evidence.push("Aparecen rutas o nombres asociados a infraestructura, adaptadores o repositorios.");
+  }
+
+  if (crossLayerRelations > 0) {
+    evidence.push(`${crossLayerRelations} conexiones cruzan entre capas.`);
+  }
+
+  if (highFanOutFiles > 0) {
+    evidence.push(`${highFanOutFiles} archivos coordinan muchas dependencias.`);
+  }
+
+  if (hasDomain && hasUseCases && hasInfrastructure) {
+    return architecturePattern({
+      id: "clean-architecture",
+      name: "Clean Architecture / Hexagonal parcial",
+      confidence: "media",
+      summary:
+        "El proyecto muestra separacion entre reglas, aplicacion e infraestructura. Conviene revisar si las dependencias realmente apuntan hacia el nucleo.",
+      evidence,
+      recommendedTarget: "Clean Architecture reforzada"
+    });
+  }
+
+  if (hasClientServer && sourceFiles >= 8) {
+    return architecturePattern({
+      id: "client-server-modular",
+      name: "Cliente-servidor modular",
+      confidence: projectProfile.stack.length > 0 ? "alta" : "media",
+      summary:
+        "La estructura parece dividir experiencia visual y servidor local, con modulos internos para analisis, snapshots y configuracion.",
+      evidence,
+      recommendedTarget: highFanOutFiles > 0 ? "Arquitectura por capas con casos de uso" : "Modular monolith ordenado"
+    });
+  }
+
+  if (hasCore && hasTests) {
+    return architecturePattern({
+      id: "layered-tooling",
+      name: "Herramienta local por capas",
+      confidence: "media",
+      summary:
+        "El proyecto se organiza como herramienta local: entrada, procesamiento, persistencia y pruebas sostienen el flujo principal.",
+      evidence,
+      recommendedTarget: "Arquitectura por capas"
+    });
+  }
+
+  return architecturePattern({
+    id: "mixed-structure",
+    name: "Estructura mixta / organica",
+    confidence: "baja",
+    summary:
+      "No hay una arquitectura dominante clara. La lectura sugiere una organizacion organica que puede ordenarse con limites mas visibles.",
+    evidence,
+    recommendedTarget: "Modular monolith"
+  });
+}
+
+function buildArchitectureOptions({ files, layers, pattern, projectProfile }) {
+  const largestLayer = layers[0];
+  const hasUiAndApi = layers.some((layer) => layer.label === "UI / Frontend") && layers.some((layer) => layer.label === "API Backend");
+  const hasAi = layers.some((layer) => layer.label.includes("AI"));
+  const highScoreFiles = files.filter((file) => file.refactorScore >= 50).length;
+  const options = [];
+
+  options.push({
+    id: "layered-use-cases",
+    name: "Arquitectura por capas con casos de uso",
+    fit: highScoreFiles > 0 ? "alta" : "media",
+    reason:
+      "Ayuda a separar entradas, casos de uso, procesamiento y persistencia sin obligar a reescribir todo el proyecto.",
+    bestFor: "Equipos que quieren ordenar responsabilidades paso a paso.",
+    phases: buildArchitecturePhases("Arquitectura por capas con casos de uso", largestLayer)
+  });
+
+  if (hasUiAndApi) {
+    options.push({
+      id: "modular-monolith",
+      name: "Modular monolith",
+      fit: pattern.id === "client-server-modular" ? "alta" : "media",
+      reason:
+        "Mantiene una sola app/repo, pero agrupa capacidades por modulos con contratos claros entre UI, API y dominio.",
+      bestFor: "Productos internos que necesitan velocidad sin partirse en microservicios.",
+      phases: buildArchitecturePhases("Modular monolith", largestLayer)
+    });
+  }
+
+  options.push({
+    id: "clean-architecture",
+    name: "Clean Architecture / Hexagonal",
+    fit: hasAi || projectProfile.hasBackend ? "media" : "baja",
+    reason:
+      "Protege reglas de negocio y flujos de cambios en frameworks, proveedores externos, IA o persistencia.",
+    bestFor: "Proyectos que van a crecer en integraciones, IA o reglas de negocio sensibles.",
+    phases: buildArchitecturePhases("Clean Architecture / Hexagonal", largestLayer)
+  });
+
+  return options.sort((a, b) => fitRank(b.fit) - fitRank(a.fit)).slice(0, 3);
+}
+
+function buildArchitecturePhases(targetName, largestLayer) {
+  return [
+    {
+      title: "Mapa de limites",
+      detail: `Marcar que archivos entrarian en ${targetName} sin moverlos todavia.`,
+      focus: largestLayer?.label ?? "capa principal"
+    },
+    {
+      title: "Contratos entre capas",
+      detail: "Definir que capa puede llamar a cual y que dependencias deberian invertirse o aislarse.",
+      focus: "relaciones"
+    },
+    {
+      title: "Refactor medible",
+      detail: "Usar commits o snapshots para validar que bajan score, fan-out y archivos gigantes.",
+      focus: "antes vs despues"
+    }
+  ];
+}
+
+function architecturePattern({ confidence, evidence, id, name, recommendedTarget, summary }) {
+  return {
+    confidence,
+    evidence: evidence.length > 0 ? evidence.slice(0, 6) : ["La inferencia se basa en rutas, capas, imports y categorias."],
+    id,
+    name,
+    recommendedTarget,
+    summary
+  };
+}
+
+function fitRank(value) {
+  if (value === "alta") {
+    return 3;
+  }
+
+  if (value === "media") {
+    return 2;
+  }
+
+  return 1;
 }
 
 function buildArchitectureSummary({ layers, projectProfile, stackLabels, totals }) {

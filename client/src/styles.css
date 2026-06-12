@@ -1417,6 +1417,172 @@ tr.selected-row td {
   font-weight: 900;
 }
 
+.architecture-pattern-panel,
+.architecture-migration-preview,
+.ai-recommendation-panel,
+.ai-usage-panel,
+.ai-architecture-advice {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 16px;
+  box-shadow: 0 12px 30px rgba(28, 43, 54, 0.05);
+}
+
+.architecture-pattern-panel {
+  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.9fr) minmax(220px, 0.7fr);
+  align-items: stretch;
+}
+
+.architecture-pattern-card,
+.architecture-evidence-card,
+.architecture-target-picker,
+.ai-recommendation-copy,
+.ai-controls label,
+.ai-usage-panel > div:first-child,
+.ai-architecture-current {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.architecture-pattern-card h2,
+.architecture-migration-preview h2,
+.ai-recommendation-copy h2,
+.ai-usage-panel h2,
+.ai-architecture-current h2 {
+  font-size: 1.12rem;
+  line-height: 1.3;
+}
+
+.architecture-pattern-card p,
+.architecture-migration-preview p,
+.ai-recommendation-copy p,
+.ai-usage-panel p,
+.ai-architecture-current p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.88rem;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.pattern-badges,
+.ai-evidence-list,
+.token-meter-grid,
+.ai-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pattern-badges span,
+.architecture-evidence-card span,
+.ai-evidence-list span,
+.architecture-migration-preview > div > span {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  border-radius: 8px;
+  background: #e8f4f1;
+  color: #1f796c;
+  padding: 0 9px;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.architecture-evidence-card strong,
+.ai-evidence-list strong,
+.architecture-target-picker span,
+.ai-controls label span {
+  color: #4b5563;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.architecture-evidence-card div {
+  display: grid;
+  gap: 7px;
+}
+
+.architecture-target-picker select,
+.ai-controls select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #101828;
+  padding: 0 10px;
+  font-weight: 850;
+}
+
+.architecture-migration-preview {
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.15fr);
+  align-items: center;
+}
+
+.migration-phase-row,
+.ai-migration-plan {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.migration-phase-row article,
+.ai-migration-plan article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #edf0f2;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.migration-phase-row article > strong,
+.ai-migration-plan article > strong {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: #1f796c;
+  color: #ffffff;
+  font-size: 0.78rem;
+}
+
+.migration-phase-row article div,
+.ai-migration-plan article div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.migration-phase-row article span,
+.ai-migration-plan article span {
+  color: #101828;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.migration-phase-row article em,
+.ai-migration-plan article p,
+.ai-migration-plan article em {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: #667085;
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
 .architecture-journey {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1638,6 +1804,30 @@ tr.selected-row td {
   font-weight: 850;
 }
 
+.file-page-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.file-page-controls button {
+  min-height: 32px;
+  border: 1px solid #9ed2c8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f796c;
+  padding: 0 10px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.file-page-controls span {
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
 .file-badge {
   display: inline-flex;
   max-width: 220px;
@@ -1841,6 +2031,136 @@ tr.selected-row td {
   font-size: 0.84rem;
   font-weight: 850;
   line-height: 1.45;
+}
+
+.ai-recommendation-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  align-items: end;
+}
+
+.ai-controls {
+  align-items: end;
+  justify-content: end;
+}
+
+.ai-controls label {
+  min-width: 220px;
+}
+
+.ai-usage-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  align-items: center;
+}
+
+.token-meter-grid {
+  justify-content: end;
+}
+
+.token-meter-grid span {
+  display: grid;
+  min-width: 112px;
+  gap: 3px;
+  border: 1px solid #edf0f2;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+  color: #667085;
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.token-meter-grid strong {
+  color: #101828;
+  font-size: 1rem;
+  font-weight: 950;
+  text-transform: none;
+}
+
+.ai-architecture-advice {
+  grid-template-columns: minmax(250px, 0.8fr) minmax(220px, 0.7fr) minmax(0, 1.2fr);
+  align-items: start;
+}
+
+.ai-evidence-list {
+  align-content: start;
+}
+
+.ai-recommendation-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-recommendation-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(28, 43, 54, 0.05);
+}
+
+.ai-recommendation-card.high {
+  border-color: #f9c7c7;
+}
+
+.ai-recommendation-card.medium {
+  border-color: #f5d99c;
+}
+
+.ai-recommendation-card.low {
+  border-color: #b8ddd6;
+}
+
+.ai-recommendation-card div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-recommendation-card div span {
+  border-radius: 8px;
+  background: #f3f6f8;
+  color: #4b5563;
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.ai-recommendation-card strong {
+  color: #101828;
+  font-size: 0.94rem;
+  font-weight: 950;
+}
+
+.ai-recommendation-card p {
+  margin: 0;
+  color: #344054;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.ai-recommendation-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.ai-recommendation-card footer em {
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: #f0faf8;
+  color: #1f796c;
+  padding: 6px 8px;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 850;
 }
 
 .recommendation {
@@ -2384,6 +2704,11 @@ tr.selected-row td {
   .three-columns,
   .architecture-explorer,
   .architecture-hero,
+  .architecture-pattern-panel,
+  .architecture-migration-preview,
+  .ai-recommendation-panel,
+  .ai-usage-panel,
+  .ai-architecture-advice,
   .file-browser-grid,
   .ignore-summary,
   .map-topbar,
@@ -2411,6 +2736,12 @@ tr.selected-row td {
   }
 
   .architecture-journey {
+    grid-template-columns: 1fr;
+  }
+
+  .migration-phase-row,
+  .ai-migration-plan,
+  .ai-recommendation-list {
     grid-template-columns: 1fr;
   }
 
@@ -2505,6 +2836,19 @@ tr.selected-row td {
   }
 
   .connection-path i {
+    width: 100%;
+  }
+
+  .ai-controls,
+  .token-meter-grid,
+  .file-page-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-controls label,
+  .token-meter-grid span,
+  .file-page-controls button {
     width: 100%;
   }
 

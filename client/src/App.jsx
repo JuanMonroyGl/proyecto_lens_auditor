@@ -35,6 +35,7 @@ const storageKey = "project-lens:scan-settings";
 const quickPatternExamples = ["outputs/**", "reports/**", "artifacts/**", ".tmp/**", "*.log"];
 const maxNodesPerColumn = 7;
 const maxFilesPerFolder = 4;
+const architectureFilePageSize = 6;
 
 const stackPresets = [
   {
@@ -887,6 +888,10 @@ function ArchitectureTab({ scan }) {
   const firstLayerId = layers[0]?.id ?? "";
   const [expandedLayerId, setExpandedLayerId] = useState(firstLayerId);
   const [selectedItem, setSelectedItem] = useState({ type: "layer", id: firstLayerId });
+  const [filePageByLayer, setFilePageByLayer] = useState({});
+  const [selectedArchitectureTarget, setSelectedArchitectureTarget] = useState(
+    insights?.recommendedPattern?.name ?? insights?.architectureOptions?.[0]?.name ?? ""
+  );
   const filesByLayer = useMemo(() => groupFilesByLayer(files), [files]);
 
   useEffect(() => {
@@ -907,6 +912,11 @@ function ArchitectureTab({ scan }) {
       setSelectedItem({ type: "layer", id: firstLayerId });
     }
   }, [expandedLayerId, files, firstLayerId, layers, selectedItem.id, selectedItem.type]);
+
+  useEffect(() => {
+    setSelectedArchitectureTarget(insights?.recommendedPattern?.name ?? insights?.architectureOptions?.[0]?.name ?? "");
+    setFilePageByLayer({});
+  }, [insights]);
 
   if (!insights) {
     return (
@@ -930,6 +940,16 @@ function ArchitectureTab({ scan }) {
   const selectFile = (filePath) => {
     setSelectedItem({ type: "file", id: filePath });
   };
+  const changeFilePage = (layerId, nextPage, totalPages) => {
+    setFilePageByLayer((current) => ({
+      ...current,
+      [layerId]: ((nextPage % totalPages) + totalPages) % totalPages
+    }));
+  };
+  const selectedTarget =
+    insights.architectureOptions?.find((option) => option.name === selectedArchitectureTarget) ??
+    insights.recommendedPattern ??
+    insights.architectureOptions?.[0];
 
   return (
     <>
@@ -946,6 +966,15 @@ function ArchitectureTab({ scan }) {
         </div>
       </section>
 
+      <ArchitecturePatternPanel
+        options={insights.architectureOptions ?? []}
+        pattern={insights.pattern}
+        selectedTarget={selectedArchitectureTarget}
+        setSelectedTarget={setSelectedArchitectureTarget}
+      />
+
+      {selectedTarget ? <ArchitectureMigrationPreview target={selectedTarget} /> : null}
+
       <ArchitectureJourney flow={insights.flow ?? []} />
 
       <section className="architecture-explorer">
@@ -960,8 +989,10 @@ function ArchitectureTab({ scan }) {
 
           <ArchitectureMap
             expandedLayerId={expandedLayer?.id ?? ""}
+            filePageByLayer={filePageByLayer}
             filesByLayer={filesByLayer}
             layers={layers}
+            onFilePageChange={changeFilePage}
             onFileSelect={selectFile}
             onLayerSelect={selectLayer}
             relations={insights.relations ?? []}
@@ -972,6 +1003,72 @@ function ArchitectureTab({ scan }) {
         <ArchitectureDetailPanel detail={selectedDetail} onFileSelect={selectFile} />
       </section>
     </>
+  );
+}
+
+function ArchitecturePatternPanel({ options, pattern, selectedTarget, setSelectedTarget }) {
+  if (!pattern) {
+    return null;
+  }
+
+  return (
+    <section className="architecture-pattern-panel">
+      <div className="architecture-pattern-card">
+        <p className="eyebrow">Arquitectura detectada</p>
+        <h2>{pattern.name}</h2>
+        <p>{pattern.summary}</p>
+        <div className="pattern-badges">
+          <span>confianza {pattern.confidence}</span>
+          <span>{formatNumber(pattern.evidence?.length ?? 0)} senales</span>
+        </div>
+      </div>
+
+      <div className="architecture-evidence-card">
+        <strong>Evidencia</strong>
+        <div>
+          {(pattern.evidence ?? []).slice(0, 4).map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      </div>
+
+      <label className="architecture-target-picker">
+        <span>Arquitectura objetivo</span>
+        <select value={selectedTarget} onChange={(event) => setSelectedTarget(event.target.value)}>
+          {options.map((option) => (
+            <option key={option.id} value={option.name}>
+              {option.name} - ajuste {option.fit}
+            </option>
+          ))}
+        </select>
+      </label>
+    </section>
+  );
+}
+
+function ArchitectureMigrationPreview({ target }) {
+  const phases = target.phases ?? [];
+
+  return (
+    <section className="architecture-migration-preview">
+      <div>
+        <p className="eyebrow">Cambio visual propuesto</p>
+        <h2>{target.name}</h2>
+        <p>{target.reason}</p>
+        <span>{target.bestFor}</span>
+      </div>
+      <div className="migration-phase-row">
+        {phases.map((phase, index) => (
+          <article key={`${phase.title}-${index}`}>
+            <strong>{index + 1}</strong>
+            <div>
+              <span>{phase.title}</span>
+              <em>{phase.detail}</em>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -997,8 +1094,10 @@ function ArchitectureJourney({ flow }) {
 
 function ArchitectureMap({
   expandedLayerId,
+  filePageByLayer,
   filesByLayer,
   layers,
+  onFilePageChange,
   onFileSelect,
   onLayerSelect,
   relations,
@@ -1017,9 +1116,11 @@ function ArchitectureMap({
         return (
           <ArchitectureLayerNode
             expanded={expanded}
+            filePage={filePageByLayer[layer.id] ?? 0}
             key={layer.id}
             layer={layer}
             layerFiles={layerFiles}
+            onFilePageChange={onFilePageChange}
             onFileSelect={onFileSelect}
             onLayerSelect={onLayerSelect}
             relatedRelations={getLayerRelations(relations, layer.label)}
@@ -1033,16 +1134,21 @@ function ArchitectureMap({
 
 function ArchitectureLayerNode({
   expanded,
+  filePage,
   layer,
   layerFiles,
+  onFilePageChange,
   onFileSelect,
   onLayerSelect,
   relatedRelations,
   selectedItem
 }) {
   const LayerIcon = getLayerIcon(layer.label);
-  const visibleFiles = layerFiles.slice(0, 5);
-  const extraCount = Math.max(0, layerFiles.length - visibleFiles.length);
+  const totalPages = Math.max(1, Math.ceil(layerFiles.length / architectureFilePageSize));
+  const currentPage = Math.min(filePage, totalPages - 1);
+  const pageStart = currentPage * architectureFilePageSize;
+  const visibleFiles = layerFiles.slice(pageStart, pageStart + architectureFilePageSize);
+  const hiddenCount = Math.max(0, layerFiles.length - visibleFiles.length);
 
   return (
     <article className={expanded ? "architecture-node expanded" : "architecture-node"}>
@@ -1077,8 +1183,22 @@ function ArchitectureLayerNode({
                 {getCompactFileName(file.relativePath)}
               </button>
             ))}
-            {extraCount > 0 ? <span className="more-files-badge">+ {formatNumber(extraCount)} archivos mas</span> : null}
+            {hiddenCount > 0 ? <span className="more-files-badge">+ {formatNumber(hiddenCount)} fuera de este bloque</span> : null}
           </div>
+
+          {totalPages > 1 ? (
+            <div className="file-page-controls">
+              <button onClick={() => onFilePageChange(layer.id, currentPage - 1, totalPages)} type="button">
+                Anterior
+              </button>
+              <span>
+                Bloque {formatNumber(currentPage + 1)} de {formatNumber(totalPages)}
+              </span>
+              <button onClick={() => onFilePageChange(layer.id, currentPage + 1, totalPages)} type="button">
+                {currentPage + 1 === totalPages ? "Volver al inicio" : "Mostrar mas"}
+              </button>
+            </div>
+          ) : null}
 
           <LayerConnectionStrip layer={layer} relations={relatedRelations} />
         </div>
@@ -1593,21 +1713,199 @@ function SnapshotsTab({
 }
 
 function RecommendationsTab({ scan }) {
+  const architectureOptions = scan.architectureInsights?.architectureOptions ?? [];
+  const [targetArchitecture, setTargetArchitecture] = useState(
+    scan.architectureInsights?.recommendedPattern?.name ?? architectureOptions[0]?.name ?? ""
+  );
+  const [aiAdvice, setAiAdvice] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  useEffect(() => {
+    setTargetArchitecture(scan.architectureInsights?.recommendedPattern?.name ?? architectureOptions[0]?.name ?? "");
+    setAiAdvice(null);
+    setAiError("");
+  }, [architectureOptions, scan]);
+
+  const generateAiAdvice = async () => {
+    setAiLoading(true);
+    setAiError("");
+
+    try {
+      const response = await fetch("/api/ai/recommendations", {
+        body: JSON.stringify({ scan, targetArchitecture }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "No fue posible generar recomendaciones con IA.");
+      }
+
+      setAiAdvice(payload.advice);
+    } catch (requestError) {
+      setAiError(requestError instanceof Error ? requestError.message : "Error generando recomendaciones con IA.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
-    <section className="workspace-grid">
-      <Panel icon={<Sparkles size={18} />} title="Recomendaciones">
-        <div className="recommendation-list">
-          {(scan.recommendations ?? []).map((item) => (
-            <article className={`recommendation ${item.severity}`} key={item.title}>
-              <strong>{item.title}</strong>
-              <span>{item.detail}</span>
-            </article>
-          ))}
+    <>
+      <section className="ai-recommendation-panel">
+        <div className="ai-recommendation-copy">
+          <p className="eyebrow">Gemini Advisor</p>
+          <h2>Recomendaciones con contexto real del scan</h2>
+          <p>
+            Envia metadata del proyecto, no contenido fuente largo: capas, rutas, scores, relaciones y senales.
+            Gemini propone recomendaciones y una ruta visual de arquitectura sin modificar archivos.
+          </p>
         </div>
-      </Panel>
-      <Panel icon={<AlertTriangle size={18} />} title="Senales principales">
-        <SignalList alerts={scan.couplingAlerts ?? []} />
-      </Panel>
+
+        <div className="ai-controls">
+          <label>
+            <span>Arquitectura destino</span>
+            <select value={targetArchitecture} onChange={(event) => setTargetArchitecture(event.target.value)}>
+              {architectureOptions.map((option) => (
+                <option key={option.id} value={option.name}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-button compact-button" disabled={aiLoading} onClick={generateAiAdvice} type="button">
+            {aiLoading ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
+            <span>{aiLoading ? "Generando" : "Generar con Gemini"}</span>
+          </button>
+        </div>
+      </section>
+
+      {aiError ? <div className="alert">{aiError}</div> : null}
+
+      {aiAdvice ? (
+        <>
+          <AiUsageSummary advice={aiAdvice} />
+          <AiArchitectureAdvice advice={aiAdvice} />
+          <AiRecommendationList recommendations={aiAdvice.recommendations ?? []} />
+        </>
+      ) : (
+        <section className="workspace-grid">
+          <Panel icon={<Sparkles size={18} />} title="Recomendaciones locales">
+            <div className="recommendation-list">
+              {(scan.recommendations ?? []).map((item) => (
+                <article className={`recommendation ${item.severity}`} key={item.title}>
+                  <strong>{item.title}</strong>
+                  <span>{item.detail}</span>
+                </article>
+              ))}
+            </div>
+          </Panel>
+          <Panel icon={<AlertTriangle size={18} />} title="Senales principales">
+            <SignalList alerts={scan.couplingAlerts ?? []} />
+          </Panel>
+        </section>
+      )}
+    </>
+  );
+}
+
+function AiUsageSummary({ advice }) {
+  const usage = advice.usage ?? {};
+  const setup = advice.setup;
+  const displayedCost = advice.source === "gemini" ? usage.estimatedCostUsd ?? 0 : usage.estimatedIfSentUsd ?? 0;
+
+  return (
+    <section className="ai-usage-panel">
+      <div>
+        <p className="eyebrow">{advice.source === "gemini" ? "Uso Gemini" : "IA pendiente"}</p>
+        <h2>{advice.model}</h2>
+        <p>
+          {advice.source === "gemini"
+            ? "Costo estimado segun tokens reportados por Gemini."
+            : `Configura ${setup?.envFile ?? "server/.env"} con ${setup?.keyName ?? "GEMINI_API_KEY"} para activar respuestas reales.`}
+        </p>
+      </div>
+      <div className="token-meter-grid">
+        <span>
+          <strong>{formatNumber(usage.inputTokens ?? 0)}</strong>
+          entrada
+        </span>
+        <span>
+          <strong>{formatNumber(usage.outputTokens ?? 0)}</strong>
+          salida
+        </span>
+        <span>
+          <strong>{formatNumber(usage.totalTokens ?? 0)}</strong>
+          total
+        </span>
+        <span>
+          <strong>{formatMoney(displayedCost)}</strong>
+          {advice.source === "gemini" ? "gastado aprox." : "si se enviara"}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function AiArchitectureAdvice({ advice }) {
+  const architecture = advice.architecture;
+
+  if (!architecture) {
+    return null;
+  }
+
+  return (
+    <section className="ai-architecture-advice">
+      <div className="ai-architecture-current">
+        <p className="eyebrow">Arquitectura</p>
+        <h2>{architecture.current}</h2>
+        <p>{architecture.rationale}</p>
+        <span>Recomendada: {architecture.recommended}</span>
+      </div>
+      <div className="ai-evidence-list">
+        <strong>Evidencia usada</strong>
+        {(architecture.evidence ?? []).map((item) => (
+          <span key={item}>{item}</span>
+        ))}
+      </div>
+      <div className="ai-migration-plan">
+        {(architecture.migrationPlan ?? []).map((phase) => (
+          <article key={`${phase.phase}-${phase.title}`}>
+            <strong>{phase.phase}</strong>
+            <div>
+              <span>{phase.title}</span>
+              <p>{phase.detail}</p>
+              {phase.files?.length > 0 ? <em>{phase.files.join(" / ")}</em> : null}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AiRecommendationList({ recommendations }) {
+  if (recommendations.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="ai-recommendation-list">
+      {recommendations.map((item) => (
+        <article className={`ai-recommendation-card ${item.severity}`} key={item.title}>
+          <div>
+            <span>{item.severity}</span>
+            <strong>{item.title}</strong>
+          </div>
+          <p>{item.detail}</p>
+          <footer>
+            <em>Impacto: {item.impact}</em>
+            <em>Esfuerzo: {item.effort}</em>
+            {item.files?.length > 0 ? <em>{item.files.slice(0, 3).join(" / ")}</em> : null}
+          </footer>
+        </article>
+      ))}
     </section>
   );
 }
@@ -2905,6 +3203,15 @@ function formatBytes(bytes) {
   const value = bytes / 1024 ** index;
 
   return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function formatMoney(value) {
+  return new Intl.NumberFormat("es-CO", {
+    currency: "USD",
+    maximumFractionDigits: 6,
+    minimumFractionDigits: 4,
+    style: "currency"
+  }).format(Number(value ?? 0));
 }
 
 function formatDate(value) {
