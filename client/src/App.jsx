@@ -25,7 +25,8 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
-  Target
+  Target,
+  X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -36,6 +37,19 @@ const quickPatternExamples = ["outputs/**", "reports/**", "artifacts/**", ".tmp/
 const maxNodesPerColumn = 7;
 const maxFilesPerFolder = 4;
 const architectureFilePageSize = 6;
+const emptyAiUsageTotal = {
+  currency: "USD",
+  estimatedCostUsd: 0,
+  inputTokens: 0,
+  lastCostUsd: 0,
+  lastModel: "",
+  lastRequestAt: "",
+  lastSource: "",
+  outputTokens: 0,
+  requestCount: 0,
+  thinkingTokens: 0,
+  totalTokens: 0
+};
 
 const stackPresets = [
   {
@@ -116,6 +130,7 @@ function App() {
   const [selectedFilePath, setSelectedFilePath] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [aiUsageTotal, setAiUsageTotal] = useState(emptyAiUsageTotal);
 
   const manualIgnorePatterns = useMemo(() => parsePatternText(manualIgnoreText), [manualIgnoreText]);
   const includeOverrides = useMemo(() => parsePatternText(includeOverridesText), [includeOverridesText]);
@@ -159,6 +174,10 @@ function App() {
 
     return scan.files.find((file) => file.relativePath === selectedFilePath) ?? null;
   }, [scan, selectedFilePath]);
+
+  useEffect(() => {
+    loadAiUsageTotal().then(setAiUsageTotal).catch(() => setAiUsageTotal(emptyAiUsageTotal));
+  }, []);
 
   useEffect(() => {
     saveSettings({
@@ -493,6 +512,8 @@ function App() {
       ) : (
         <EmptyState />
       )}
+
+      <GeminiFloatingAdvisor scan={scan} usageTotal={aiUsageTotal} onUsageUpdate={setAiUsageTotal} />
     </main>
   );
 }
@@ -707,11 +728,11 @@ function Dashboard({
 
       <DashboardTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {activeTab === "summary" ? (
-        <SummaryTab scan={scan} />
-      ) : null}
+      {activeTab === "summary" ? <SummaryTab scan={scan} setActiveTab={setActiveTab} /> : null}
 
-      {activeTab === "critical" ? (
+      {activeTab === "architecture" ? <ArchitectureTab scan={scan} /> : null}
+
+      {activeTab === "files" ? (
         <CriticalTab
           extensionFilter={extensionFilter}
           extensionOptions={extensionOptions}
@@ -726,24 +747,7 @@ function Dashboard({
         />
       ) : null}
 
-      {activeTab === "architecture" ? <ArchitectureTab scan={scan} /> : null}
-
-      {activeTab === "categories" ? <CategoriesTab scan={scan} /> : null}
-
-      {activeTab === "ignored" ? (
-        <IgnoredFiltersTab
-          disabledRules={disabledRules}
-          includeOverridesText={includeOverridesText}
-          onSaveConfig={onSaveConfig}
-          scan={scan}
-          setIncludeOverridesText={setIncludeOverridesText}
-          toggleDisabledRule={toggleDisabledRule}
-        />
-      ) : null}
-
-      {activeTab === "dependencies" ? <DependenciesTab scan={scan} /> : null}
-
-      {activeTab === "snapshots" ? (
+      {activeTab === "compare" ? (
         <SnapshotsTab
           onCompareSnapshots={onCompareSnapshots}
           onSaveSnapshot={onSaveSnapshot}
@@ -758,8 +762,16 @@ function Dashboard({
         />
       ) : null}
 
-      {activeTab === "recommendations" ? <RecommendationsTab scan={scan} /> : null}
-
+      {activeTab === "settings" ? (
+        <SettingsTab
+          disabledRules={disabledRules}
+          includeOverridesText={includeOverridesText}
+          onSaveConfig={onSaveConfig}
+          scan={scan}
+          setIncludeOverridesText={setIncludeOverridesText}
+          toggleDisabledRule={toggleDisabledRule}
+        />
+      ) : null}
       {scan.errors.length > 0 ? (
         <section className="table-panel">
           <div className="table-heading compact">
@@ -785,13 +797,10 @@ function Dashboard({
 
 const dashboardTabs = [
   { id: "summary", label: "Resumen" },
-  { id: "critical", label: "Archivos criticos" },
   { id: "architecture", label: "Arquitectura" },
-  { id: "categories", label: "Categorias" },
-  { id: "ignored", label: "Ignorados / filtros" },
-  { id: "dependencies", label: "Dependencias" },
-  { id: "snapshots", label: "Antes vs despues" },
-  { id: "recommendations", label: "Recomendaciones" }
+  { id: "files", label: "Archivos" },
+  { id: "compare", label: "Comparar" },
+  { id: "settings", label: "Configuracion" }
 ];
 
 function DashboardTabs({ activeTab, setActiveTab }) {
@@ -811,36 +820,112 @@ function DashboardTabs({ activeTab, setActiveTab }) {
   );
 }
 
-function SummaryTab({ scan }) {
+function SummaryTab({ scan, setActiveTab }) {
+  const quickRead = buildQuickRead(scan);
+
   return (
     <>
-      <IgnoreSummary scan={scan} />
+      <section className="quick-read-panel">
+        <div className="quick-read-heading">
+          <div>
+            <p className="eyebrow">Lectura rapida</p>
+            <h2>{quickRead.title}</h2>
+            <p>{quickRead.subtitle}</p>
+          </div>
+          <span>{quickRead.confidence}</span>
+        </div>
 
-      <section className="workspace-grid">
-        <Panel icon={<Gauge size={18} />} title="Archivos criticos para refactor">
-          <HotspotList files={scan.refactorHotspots} />
+        <div className="quick-read-grid">
+          <article>
+            <strong>Que pasa</strong>
+            <p>{quickRead.whatHappens}</p>
+          </article>
+          <article>
+            <strong>Por que importa</strong>
+            <p>{quickRead.whyItMatters}</p>
+          </article>
+          <article>
+            <strong>Donde mirar</strong>
+            <p>{quickRead.whereToLook}</p>
+          </article>
+          <article>
+            <strong>Que haria despues</strong>
+            <p>{quickRead.nextStep}</p>
+          </article>
+        </div>
+
+        <div className="quick-action-row">
+          <button className="secondary-button" onClick={() => setActiveTab("architecture")} type="button">
+            <MapIcon size={16} />
+            <span>Entender arquitectura</span>
+          </button>
+          <button className="secondary-button" onClick={() => setActiveTab("files")} type="button">
+            <FileText size={16} />
+            <span>Ver archivos</span>
+          </button>
+          <button className="secondary-button" onClick={() => setActiveTab("compare")} type="button">
+            <GitBranch size={16} />
+            <span>Comparar cambios</span>
+          </button>
+        </div>
+      </section>
+
+      <section className="workspace-grid simple-summary-grid">
+        <Panel icon={<Gauge size={18} />} title="Riesgos principales">
+          <HotspotList files={scan.refactorHotspots?.slice(0, 6) ?? []} />
         </Panel>
 
-        <Panel icon={<BarChart3 size={18} />} title="Distribucion por extension">
-          <ExtensionDistribution items={scan.byExtension} />
+        <Panel icon={<Sparkles size={18} />} title="Siguiente recomendacion">
+          <div className="insight-stack">
+            {(scan.recommendations ?? []).slice(0, 3).map((item) => (
+              <article key={item.title}>
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+              </article>
+            ))}
+          </div>
         </Panel>
       </section>
 
-      <section className="workspace-grid three-columns">
-        <Panel icon={<BarChart3 size={18} />} title="Top 20 por lineas">
-          <RankedList files={scan.topByLines} metric="lines" metricLabel="lineas" />
-        </Panel>
-
-        <Panel icon={<Database size={18} />} title="Top 20 por tamano">
-          <RankedList files={scan.topBySize} metric="bytes" metricLabel="tamano" formatter={formatBytes} />
-        </Panel>
-
-        <Panel icon={<FolderTree size={18} />} title="Carpetas con mas lineas">
-          <FolderList folders={scan.foldersByLines} />
-        </Panel>
-      </section>
+      <details className="progressive-section">
+        <summary>Ver datos tecnicos del resumen</summary>
+        <IgnoreSummary scan={scan} />
+        <section className="workspace-grid three-columns">
+          <Panel icon={<BarChart3 size={18} />} title="Top 20 por lineas">
+            <RankedList files={scan.topByLines} metric="lines" metricLabel="lineas" />
+          </Panel>
+          <Panel icon={<Database size={18} />} title="Top 20 por tamano">
+            <RankedList files={scan.topBySize} metric="bytes" metricLabel="tamano" formatter={formatBytes} />
+          </Panel>
+          <Panel icon={<FolderTree size={18} />} title="Carpetas con mas lineas">
+            <FolderList folders={scan.foldersByLines} />
+          </Panel>
+        </section>
+      </details>
     </>
   );
+}
+
+function buildQuickRead(scan) {
+  const architecture = scan.architectureInsights ?? {};
+  const primary = architecture.primaryArchitecture ?? architecture.pattern ?? {};
+  const topFile = scan.refactorHotspots?.[0];
+  const highRiskCount = (scan.refactorHotspots ?? []).filter((file) => file.refactorScore >= 45).length;
+  const target = architecture.recommendedArchitectureTargets?.[0] ?? architecture.recommendedPattern;
+
+  return {
+    confidence: `Confianza ${primary.confidence ?? "media"}`,
+    nextStep: target?.name
+      ? `Pidele a Gemini un plan hacia ${target.name}, o revisa primero los archivos con mas score.`
+      : "Revisa la arquitectura y luego pide una recomendacion con Gemini.",
+    subtitle: "Una lectura humana antes de entrar a los detalles tecnicos.",
+    title: primary.name ?? "Proyecto escaneado",
+    whatHappens: architecture.summary ?? "Project Lens ya leyo rutas, tamanos, capas, relaciones y senales de riesgo.",
+    whereToLook: topFile ? `${topFile.relativePath} aparece como primer punto de atencion.` : "No hay un hotspot fuerte; mira arquitectura y comparaciones.",
+    whyItMatters: highRiskCount > 0
+      ? `${formatNumber(highRiskCount)} archivos tienen senales que conviene revisar antes de refactorizar.`
+      : "No se ven alertas fuertes; lo importante es mantener cambios pequenos y medibles."
+  };
 }
 
 function CriticalTab({
@@ -960,7 +1045,7 @@ function ArchitectureTab({ scan }) {
     <>
       <section className="architecture-hero">
         <div>
-          <p className="eyebrow">Architecture Explorer</p>
+          <p className="eyebrow">Arquitectura simple</p>
           <h2>{primaryArchitecture.name}</h2>
           <p>{primaryArchitecture.description ?? insights.summary}</p>
         </div>
@@ -1038,9 +1123,9 @@ function ArchitectureTab({ scan }) {
 
 function ArchitectureViewTabs({ activeView, setActiveView }) {
   const views = [
-    { id: "explorer", label: "Explorer", icon: <MapIcon size={15} /> },
-    { id: "evidence", label: "Evidence", icon: <ShieldCheck size={15} /> },
-    { id: "migration", label: "Migration", icon: <GitBranch size={15} /> }
+    { id: "explorer", label: "Mapa", icon: <MapIcon size={15} /> },
+    { id: "evidence", label: "Evidencia", icon: <ShieldCheck size={15} /> },
+    { id: "migration", label: "Migracion", icon: <GitBranch size={15} /> }
   ];
 
   return (
@@ -1868,6 +1953,26 @@ function CategoriesTab({ scan }) {
   );
 }
 
+function SettingsTab({ disabledRules, includeOverridesText, onSaveConfig, scan, setIncludeOverridesText, toggleDisabledRule }) {
+  return (
+    <>
+      <IgnoredFiltersTab
+        disabledRules={disabledRules}
+        includeOverridesText={includeOverridesText}
+        onSaveConfig={onSaveConfig}
+        scan={scan}
+        setIncludeOverridesText={setIncludeOverridesText}
+        toggleDisabledRule={toggleDisabledRule}
+      />
+
+      <details className="progressive-section">
+        <summary>Ver categorias y dependencias tecnicas</summary>
+        <CategoriesTab scan={scan} />
+        <DependenciesTab scan={scan} />
+      </details>
+    </>
+  );
+}
 function IgnoredFiltersTab({
   disabledRules,
   includeOverridesText,
@@ -2257,6 +2362,208 @@ function AiRecommendationList({ recommendations }) {
   );
 }
 
+function GeminiFloatingAdvisor({ onUsageUpdate, scan, usageTotal }) {
+  const [open, setOpen] = useState(false);
+  const [advice, setAdvice] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const architectureOptions = useMemo(() => getArchitectureTargets(scan?.architectureInsights), [scan]);
+  const defaultTargetId = getTargetValue(architectureOptions[0] ?? scan?.architectureInsights?.recommendedPattern ?? null);
+  const [targetArchitectureId, setTargetArchitectureId] = useState(defaultTargetId);
+  const selectedTarget =
+    architectureOptions.find((option) => getTargetValue(option) === targetArchitectureId) ??
+    architectureOptions[0] ??
+    scan?.architectureInsights?.recommendedPattern;
+  const total = usageTotal ?? emptyAiUsageTotal;
+  const currentUsage = advice?.usage ?? null;
+
+  useEffect(() => {
+    setTargetArchitectureId(getTargetValue(architectureOptions[0] ?? scan?.architectureInsights?.recommendedPattern ?? null));
+    setAdvice(null);
+    setAiError("");
+  }, [architectureOptions, scan]);
+
+  const generateAiAdvice = async () => {
+    if (!scan) {
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError("");
+
+    try {
+      const response = await fetch("/api/ai/recommendations", {
+        body: JSON.stringify({
+          scan,
+          targetArchitecture: selectedTarget?.name ?? "",
+          targetArchitectureId: selectedTarget?.id ?? ""
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "No fue posible generar recomendaciones con IA.");
+      }
+
+      setAdvice(payload.advice);
+      onUsageUpdate(payload.usage ?? payload.advice?.usageTotal ?? total);
+    } catch (requestError) {
+      setAiError(requestError instanceof Error ? requestError.message : "Error generando recomendaciones con IA.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const resetUsage = async () => {
+    if (!window.confirm("Seguro que quieres reiniciar el contador total de Gemini?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/ai/usage/reset", { method: "POST" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "No fue posible reiniciar el contador.");
+      }
+
+      onUsageUpdate(payload.usage ?? emptyAiUsageTotal);
+      setAdvice((current) => (current ? { ...current, usageTotal: payload.usage ?? emptyAiUsageTotal } : current));
+    } catch (requestError) {
+      setAiError(requestError instanceof Error ? requestError.message : "Error reiniciando contador.");
+    }
+  };
+
+  return (
+    <>
+      <button
+        className={scan ? "gemini-floating-button" : "gemini-floating-button disabled"}
+        disabled={!scan}
+        onClick={() => setOpen(true)}
+        type="button"
+      >
+        <Sparkles size={18} />
+        <span>Gemini</span>
+        <em>{formatMoney(total.estimatedCostUsd)} total</em>
+      </button>
+
+      {open ? (
+        <div className="gemini-overlay" role="dialog" aria-modal="true" aria-label="Gemini Advisor">
+          <aside className="gemini-panel">
+            <header className="gemini-panel-header">
+              <div>
+                <p className="eyebrow">Gemini Advisor</p>
+                <h2>Plan de accion claro</h2>
+                <span>{scan?.architectureInsights?.primaryArchitecture?.name ?? scan?.architectureInsights?.pattern?.name ?? "Escanea un proyecto"}</span>
+              </div>
+              <button className="icon-button" onClick={() => setOpen(false)} type="button" aria-label="Cerrar Gemini">
+                <X size={18} />
+              </button>
+            </header>
+
+            <section className="gemini-counter-grid">
+              <GeminiCounterCard title="Esta consulta" usage={currentUsage} source={advice?.source} />
+              <GeminiCounterCard title="Total del proyecto" usage={total} total />
+            </section>
+
+            <div className="gemini-controls">
+              <label>
+                <span>Arquitectura destino</span>
+                <select value={targetArchitectureId} onChange={(event) => setTargetArchitectureId(event.target.value)}>
+                  {architectureOptions.map((option) => (
+                    <option key={getTargetValue(option)} value={getTargetValue(option)}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="primary-button compact-button" disabled={!scan || aiLoading} onClick={generateAiAdvice} type="button">
+                {aiLoading ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
+                <span>{aiLoading ? "Generando" : "Generar recomendaciones"}</span>
+              </button>
+            </div>
+
+            {aiError ? <div className="alert compact-alert">{aiError}</div> : null}
+
+            {advice ? (
+              <div className="gemini-results">
+                <div className="gemini-result-summary">
+                  <strong>{advice.source === "gemini" ? "Respuesta de Gemini" : "Fallback local"}</strong>
+                  <span>{advice.executiveSummary}</span>
+                </div>
+                {(advice.recommendations ?? []).map((item) => (
+                  <article className={`gemini-result-card ${item.severity}`} key={item.title}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{item.detail}</span>
+                    </div>
+                    <footer>
+                      <em>Impacto: {item.impact}</em>
+                      <em>Esfuerzo: {item.effort}</em>
+                      {item.layer ? <em>{item.layer}</em> : null}
+                    </footer>
+                    {item.evidence?.length > 0 ? (
+                      <details>
+                        <summary>Ver evidencia tecnica</summary>
+                        <ul>
+                          {item.evidence.map((evidence) => (
+                            <li key={evidence}>{evidence}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="gemini-empty-copy">Elige una arquitectura destino y genera un plan. Puedes seguir navegando: Gemini queda siempre a mano.</p>
+            )}
+
+            <button className="secondary-button gemini-reset-button" onClick={resetUsage} type="button">
+              <RefreshCw size={15} />
+              <span>Reiniciar contador total</span>
+            </button>
+          </aside>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function GeminiCounterCard({ source, title, total = false, usage }) {
+  const current = usage ?? emptyAiUsageTotal;
+  const cost = total
+    ? current.estimatedCostUsd
+    : source === "gemini"
+      ? current.estimatedCostUsd
+      : current.estimatedIfSentUsd ?? 0;
+
+  return (
+    <article className="gemini-counter-card">
+      <span>{title}</span>
+      <strong>{formatMoney(cost)}</strong>
+      <em>{formatNumber(current.totalTokens ?? 0)} tokens</em>
+      <small>
+        {formatNumber(current.inputTokens ?? 0)} entrada / {formatNumber(current.outputTokens ?? 0)} salida
+        {(current.thinkingTokens ?? 0) > 0 ? ` / ${formatNumber(current.thinkingTokens)} thinking` : ""}
+      </small>
+      {total ? <small>{formatNumber(current.requestCount ?? 0)} consultas</small> : null}
+    </article>
+  );
+}
+
+async function loadAiUsageTotal() {
+  const response = await fetch("/api/ai/usage");
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error || "No fue posible leer el contador de Gemini.");
+  }
+
+  return payload.usage ?? emptyAiUsageTotal;
+}
 function DashboardActions({ onOpenMap, scan, secureMode }) {
   return (
     <section className="dashboard-actions">

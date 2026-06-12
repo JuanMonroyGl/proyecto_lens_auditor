@@ -6,6 +6,7 @@ import { scanProject } from "./scanner.js";
 import { loadProjectLensConfig, saveProjectLensConfig } from "./config.js";
 import { compareSnapshotPair, listSnapshots, saveSnapshot } from "./snapshots.js";
 import { loadServerEnv } from "./env.js";
+import { attachAiUsageTotal, readAiUsageLedger, resetAiUsageLedger } from "./aiUsageLedger.js";
 
 loadServerEnv();
 
@@ -173,6 +174,26 @@ app.post("/api/versions/compare", async (req, res) => {
   }
 });
 
+app.get("/api/ai/usage", async (_req, res) => {
+  try {
+    res.json({ usage: await readAiUsageLedger() });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "No fue posible leer el contador de Gemini."
+    });
+  }
+});
+
+app.post("/api/ai/usage/reset", async (_req, res) => {
+  try {
+    res.json({ usage: await resetAiUsageLedger() });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "No fue posible reiniciar el contador de Gemini."
+    });
+  }
+});
+
 app.post("/api/ai/recommendations", async (req, res) => {
   const scan = req.body?.scan;
 
@@ -182,15 +203,16 @@ app.post("/api/ai/recommendations", async (req, res) => {
   }
 
   try {
-    res.json({
-      advice: await buildAiRecommendations({
-        scan,
-        targetArchitecture:
-          typeof req.body?.targetArchitecture === "string" ? req.body.targetArchitecture.trim() : "",
-        targetArchitectureId:
-          typeof req.body?.targetArchitectureId === "string" ? req.body.targetArchitectureId.trim() : ""
-      })
+    const advice = await buildAiRecommendations({
+      scan,
+      targetArchitecture:
+        typeof req.body?.targetArchitecture === "string" ? req.body.targetArchitecture.trim() : "",
+      targetArchitectureId:
+        typeof req.body?.targetArchitectureId === "string" ? req.body.targetArchitectureId.trim() : ""
     });
+    const adviceWithUsage = await attachAiUsageTotal(advice);
+
+    res.json({ advice: adviceWithUsage, usage: adviceWithUsage.usageTotal });
   } catch (error) {
     res.status(502).json({
       error: error instanceof Error ? error.message : "No fue posible generar recomendaciones con IA."

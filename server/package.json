@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "check": "node --check src/index.js && node --check src/scanner.js && node --check src/config.js && node --check src/codeAnalysis.js && node --check src/snapshots.js && node --check src/gitVersions.js && node --check src/insights.js && node --check src/env.js && node --check src/geminiAdvisor.js && node --check src/architectureKnowledge.js"
+    "check": "node --check src/index.js && node --check src/scanner.js && node --check src/config.js && node --check src/codeAnalysis.js && node --check src/snapshots.js && node --check src/gitVersions.js && node --check src/insights.js && node --check src/env.js && node --check src/geminiAdvisor.js && node --check src/architectureKnowledge.js && node --check src/aiUsageLedger.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
