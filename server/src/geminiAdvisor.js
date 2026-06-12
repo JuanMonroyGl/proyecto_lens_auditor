@@ -11,11 +11,12 @@ const GEMINI_2_5_PRO_PRICING = {
   }
 };
 
-export async function buildAiRecommendations({ scan, targetArchitecture }) {
+export async function buildAiRecommendations({ scan, targetArchitecture, targetArchitectureId }) {
   const model = process.env.GEMINI_MODEL || GEMINI_MODEL;
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
-  const prompt = buildRecommendationPrompt(scan, targetArchitecture);
-  const fallback = buildLocalAdvice(scan, targetArchitecture);
+  const target = resolveTargetArchitecture(scan, targetArchitecture, targetArchitectureId);
+  const prompt = buildRecommendationPrompt(scan, target);
+  const fallback = buildLocalAdvice(scan, target);
 
   if (!apiKey) {
     const inputTokens = estimateTokens(prompt);
@@ -95,10 +96,33 @@ export async function buildAiRecommendations({ scan, targetArchitecture }) {
   });
 }
 
-function buildRecommendationPrompt(scan, targetArchitecture) {
+
+function resolveTargetArchitecture(scan, targetArchitecture, targetArchitectureId) {
+  const architecture = scan?.architectureInsights ?? {};
+  const targets = architecture.recommendedArchitectureTargets ?? architecture.architectureOptions ?? [];
+  const byId = targets.find((item) => item.id === targetArchitectureId);
+
+  if (byId) {
+    return byId;
+  }
+
+  const byName = targets.find((item) => item.name === targetArchitecture);
+
+  if (byName) {
+    return byName;
+  }
+
+  if (targetArchitecture) {
+    return { id: targetArchitectureId || "custom", name: targetArchitecture };
+  }
+
+  return targets[0] ?? architecture.recommendedPattern ?? null;
+}
+
+function buildRecommendationPrompt(scan, target) {
   const compact = compactScan(scan);
-  const targetCopy = targetArchitecture
-    ? `El usuario esta evaluando migrar visualmente hacia: ${targetArchitecture}.`
+  const targetCopy = target?.name
+    ? `El usuario esta evaluando migrar visualmente hacia: ${target.name} (${target.id || "sin-id"}). Usa sus senales, diagrama y fases como objetivo.`
     : "Sugiere una arquitectura objetivo si detectas una mejor opcion.";
 
   return [
@@ -123,7 +147,8 @@ function buildRecommendationPrompt(scan, targetArchitecture) {
             impact: "beneficio esperado",
             effort: "S | M | L",
             files: ["ruta/opcional.js"],
-            layer: "capa opcional"
+            layer: "capa opcional",
+            evidence: ["evidencia concreta del scan"]
           }
         ],
         architecture: {
@@ -131,6 +156,7 @@ function buildRecommendationPrompt(scan, targetArchitecture) {
           confidence: "alta | media | baja",
           evidence: ["senal concreta"],
           recommended: "arquitectura sugerida",
+          recommendedId: "id_del_catalogo_si_aplica",
           rationale: "por que seria mejor",
           migrationPlan: [
             {
@@ -160,6 +186,13 @@ function compactScan(scan) {
     totals: scan?.totals,
     stack: architecture.stack ?? [],
     detectedArchitecture: architecture.pattern,
+    primaryArchitecture: architecture.primaryArchitecture,
+    secondaryArchitectures: architecture.secondaryArchitectures ?? [],
+    architectureMatches: (architecture.architectureMatches ?? []).slice(0, 6),
+    architectureEvidence: architecture.evidence ?? [],
+    architectureContradictions: architecture.contradictions ?? [],
+    recommendedArchitectureTargets: architecture.recommendedArchitectureTargets ?? [],
+    migrationPaths: architecture.migrationPaths ?? [],
     layers: (architecture.layers ?? []).map((layer) => ({
       label: layer.label,
       files: layer.files,
@@ -212,7 +245,8 @@ function normalizeRecommendations(items, fallbackItems) {
     impact: cleanString(item.impact) || "Mejora claridad y reduce riesgo de cambios.",
     effort: cleanString(item.effort) || "M",
     files: Array.isArray(item.files) ? item.files.map(String).slice(0, 5) : [],
-    layer: cleanString(item.layer)
+    layer: cleanString(item.layer),
+    evidence: Array.isArray(item.evidence) ? item.evidence.map(String).slice(0, 5) : []
   }));
 }
 
@@ -224,6 +258,7 @@ function normalizeArchitecture(item, fallbackItem) {
     confidence: cleanString(source.confidence) || fallbackItem.confidence,
     evidence: Array.isArray(source.evidence) ? source.evidence.map(String).slice(0, 6) : fallbackItem.evidence,
     recommended: cleanString(source.recommended) || fallbackItem.recommended,
+    recommendedId: cleanString(source.recommendedId) || fallbackItem.recommendedId || "",
     rationale: cleanString(source.rationale) || fallbackItem.rationale,
     migrationPlan: normalizeMigrationPlan(source.migrationPlan, fallbackItem.migrationPlan)
   };
@@ -241,14 +276,15 @@ function normalizeMigrationPlan(items, fallbackItems) {
   }));
 }
 
-function buildLocalAdvice(scan, targetArchitecture) {
+function buildLocalAdvice(scan, target) {
   const architecture = scan?.architectureInsights ?? {};
   const pattern = architecture.pattern ?? {};
+  const primary = architecture.primaryArchitecture ?? {};
   const highFiles = [...(scan?.files ?? [])]
     .sort((a, b) => b.refactorScore - a.refactorScore || b.lines - a.lines)
     .slice(0, 5);
   const recommended =
-    targetArchitecture ||
+    target?.name ||
     architecture.recommendedPattern?.name ||
     pattern.recommendedTarget ||
     "Arquitectura modular por capas";
@@ -267,7 +303,8 @@ function buildLocalAdvice(scan, targetArchitecture) {
         impact: "Reduce riesgo antes de discutir cambios grandes de arquitectura.",
         effort: "M",
         files: highFiles.map((file) => file.relativePath),
-        layer: highFiles[0]?.fileInsights?.layer ?? ""
+        layer: highFiles[0]?.fileInsights?.layer ?? "",
+        evidence: (architecture.evidence ?? []).slice(0, 3).map((item) => item.label ?? String(item))
       },
       {
         title: `Evaluar migracion hacia ${recommended}`,
@@ -277,14 +314,16 @@ function buildLocalAdvice(scan, targetArchitecture) {
         impact: "Da una ruta compartida para PM, PO y developers sin modificar archivos automaticamente.",
         effort: "L",
         files: highFiles.slice(0, 3).map((file) => file.relativePath),
-        layer: ""
+        layer: "",
+        evidence: (architecture.contradictions ?? []).slice(0, 3).map((item) => item.label ?? String(item))
       }
     ],
     architecture: {
-      current: pattern.name ?? "Arquitectura mixta detectada",
-      confidence: pattern.confidence ?? "media",
-      evidence: pattern.evidence ?? [],
+      current: primary.name ?? pattern.name ?? "Arquitectura mixta detectada",
+      confidence: primary.confidence ?? pattern.confidence ?? "media",
+      evidence: (architecture.evidence ?? primary.evidence ?? pattern.evidence ?? []).map((item) => item.label ?? String(item)).slice(0, 6),
       recommended,
+      recommendedId: target?.id ?? architecture.recommendedPattern?.id ?? "",
       rationale:
         architecture.recommendedPattern?.reason ||
         "Puede mejorar separacion de responsabilidades, testabilidad y lectura del sistema.",

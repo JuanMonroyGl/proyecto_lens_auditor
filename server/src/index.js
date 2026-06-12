@@ -186,7 +186,9 @@ app.post("/api/ai/recommendations", async (req, res) => {
       advice: await buildAiRecommendations({
         scan,
         targetArchitecture:
-          typeof req.body?.targetArchitecture === "string" ? req.body.targetArchitecture.trim() : ""
+          typeof req.body?.targetArchitecture === "string" ? req.body.targetArchitecture.trim() : "",
+        targetArchitectureId:
+          typeof req.body?.targetArchitectureId === "string" ? req.body.targetArchitectureId.trim() : ""
       })
     });
   } catch (error) {

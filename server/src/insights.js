@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { evaluateArchitectureCatalog } from "./architectureKnowledge.js";
 
 const ENTRYPOINT_NAMES = new Set(["index", "main", "app", "server"]);
 const SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".ts", ".tsx", ".py", ".java", ".cs", ".go", ".rb", ".php"]);
@@ -68,8 +69,17 @@ function buildArchitectureInsights({ dependencies, files, packageManifests, proj
   const keyFiles = buildKeyFiles(files);
   const flow = buildProjectFlow(projectProfile, keyFiles);
   const relations = buildLayerRelations(files, dependencies);
-  const pattern = detectArchitecturePattern({ dependencies, files, layers, projectProfile });
-  const architectureOptions = buildArchitectureOptions({ files, layers, pattern, projectProfile });
+  const architectureEvaluation = evaluateArchitectureCatalog({
+    dependencies,
+    files,
+    layers,
+    packageManifests,
+    projectProfile
+  });
+  const pattern = buildLegacyArchitecturePattern(architectureEvaluation.primaryArchitecture);
+  const architectureOptions = architectureEvaluation.recommendedArchitectureTargets.length > 0
+    ? architectureEvaluation.recommendedArchitectureTargets
+    : buildArchitectureOptions({ files, layers, pattern, projectProfile });
   const stackLabels = projectProfile.stack.length > 0 ? projectProfile.stack.join(", ") : "estructura local";
 
   return {
@@ -80,6 +90,14 @@ function buildArchitectureInsights({ dependencies, files, packageManifests, proj
     pattern,
     recommendedPattern: architectureOptions[0],
     architectureOptions,
+    architectureMatches: architectureEvaluation.architectureMatches,
+    catalogVersion: architectureEvaluation.catalogVersion,
+    primaryArchitecture: architectureEvaluation.primaryArchitecture,
+    secondaryArchitectures: architectureEvaluation.secondaryArchitectures,
+    recommendedArchitectureTargets: architectureEvaluation.recommendedArchitectureTargets,
+    evidence: architectureEvaluation.evidence,
+    contradictions: architectureEvaluation.contradictions,
+    migrationPaths: architectureEvaluation.migrationPaths,
     layers,
     flow,
     keyFiles,
@@ -277,6 +295,21 @@ function buildLayerRelations(files, dependencies) {
       ...item,
       detail: describeRelation(item)
     }));
+}
+
+function buildLegacyArchitecturePattern(match) {
+  return {
+    confidence: match.confidence,
+    contradictions: match.contradictions?.map((item) => item.label) ?? [],
+    diagramType: match.uiHints?.diagram_type ?? "layers",
+    evidence: match.evidence?.map((item) => item.label) ?? [],
+    family: match.family,
+    id: match.id,
+    name: match.name,
+    recommendedTarget: match.migrationTo?.[0] ?? "modular_monolith",
+    score: match.score,
+    summary: match.description
+  };
 }
 
 function detectArchitecturePattern({ dependencies, files, layers, projectProfile }) {

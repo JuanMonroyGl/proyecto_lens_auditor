@@ -1,0 +1,1638 @@
+{
+  "version": "1.0.0",
+  "architectures": [
+    {
+      "id": "layered_n_tier",
+      "name": "Layered Architecture / N-tier",
+      "aliases": [
+        "n-tier",
+        "n-layer",
+        "three-tier",
+        "controller-service-repository"
+      ],
+      "family": "layered",
+      "description": "Organiza la aplicación por capas técnicas; algunas capas pueden desplegarse en tiers físicos separados.",
+      "when_to_use": [
+        "CRUD empresarial",
+        "legacy modernization",
+        "equipos que priorizan simplicidad"
+      ],
+      "when_not_to_use": [
+        "dominio complejo",
+        "alto desacoplamiento requerido"
+      ],
+      "complexity": "media",
+      "project_types": [
+        "backend",
+        "fullstack",
+        "enterprise",
+        "legacy"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "controllers",
+            "match_type": "segment",
+            "weight": 8,
+            "evidence_type": "folder",
+            "examples": [
+              "src/controllers"
+            ]
+          },
+          {
+            "pattern": "services",
+            "match_type": "segment",
+            "weight": 8,
+            "evidence_type": "folder",
+            "examples": [
+              "src/services"
+            ]
+          },
+          {
+            "pattern": "repositories|dao|dal",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "folder",
+            "examples": [
+              "src/repositories"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": ".*Controller\\.(cs|ts|java|php)$",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "file",
+            "examples": [
+              "UserController.cs"
+            ]
+          },
+          {
+            "pattern": ".*Service\\.(cs|ts|java|php)$",
+            "match_type": "regex",
+            "weight": 7,
+            "evidence_type": "file",
+            "examples": [
+              "OrderService.ts"
+            ]
+          },
+          {
+            "pattern": ".*Repository\\.(cs|ts|java|php)$",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "file",
+            "examples": [
+              "OrderRepository.java"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "entityframework|spring-data|typeorm|sequelize",
+            "match_type": "regex",
+            "weight": 6,
+            "evidence_type": "dependency",
+            "examples": [
+              "spring-data-jpa"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "controllers->services",
+            "match_type": "relation",
+            "weight": 10,
+            "evidence_type": "import_graph",
+            "examples": [
+              "controller imports service"
+            ]
+          },
+          {
+            "pattern": "services->repositories",
+            "match_type": "relation",
+            "weight": 10,
+            "evidence_type": "import_graph",
+            "examples": [
+              "service imports repository"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "single_deployable_plus_layered_packages",
+            "match_type": "composite",
+            "weight": 12,
+            "evidence_type": "structure",
+            "examples": [
+              "one API + internal layers"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "controllers->repositories",
+            "match_type": "relation",
+            "weight": 12,
+            "evidence_type": "import_graph",
+            "examples": [
+              "controller bypasses service"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.25,
+          "files": 0.15,
+          "dependencies": 0.15,
+          "imports": 0.25,
+          "patterns": 0.2
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "fat controllers",
+        "empty services",
+        "DAL leaked to UI"
+      ],
+      "advantages": [
+        "simple",
+        "fácil de explicar",
+        "alta detectabilidad"
+      ],
+      "risks": [
+        "acoplamiento top-down",
+        "capas sin valor",
+        "dificulta aislar dominio"
+      ],
+      "migration_from": [
+        "traditional_monolith",
+        "mvc"
+      ],
+      "migration_to": [
+        "clean_architecture",
+        "modular_monolith",
+        "microservices"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Layer lanes",
+          "intent": "mostrar dependencias permitidas",
+          "ui_action": "swimlanes por capa y edges ilegales"
+        }
+      ],
+      "example_folder_structure": [
+        "src/controllers",
+        "src/services",
+        "src/repositories",
+        "src/models",
+        "src/data"
+      ],
+      "sample_repos": [
+        {
+          "name": "nuyonu/N-Tier-Architecture",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/nuyonu/N-Tier-Architecture"
+        }
+      ],
+      "ui_hints": {
+        "diagram_type": "layers",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "controllers",
+          "repositories"
+        ]
+      },
+      "explanations": {
+        "developer": "Detectamos {name} con {confidence}% por {top_evidence}.",
+        "pm": "La estructura favorece orden técnico, pero no independencia fina por dominio.",
+        "po": "Es útil para apps tradicionales; si el producto crece conviene modularizar."
+      },
+      "comparison": {
+        "scalability": "media",
+        "metadata_detectability": "alta",
+        "coupling": "medio-alto",
+        "operational_cost": "bajo-medio",
+        "team_fit": "mixto"
+      }
+    },
+    {
+      "id": "clean_architecture",
+      "name": "Clean Architecture",
+      "aliases": [
+        "clean",
+        "application core",
+        "use cases"
+      ],
+      "family": "concentric_domain_core",
+      "description": "La lógica de negocio vive en el centro y la infraestructura depende de ella.",
+      "when_to_use": [
+        "monolitos no triviales",
+        "APIs con negocio complejo",
+        "equipos que priorizan testabilidad"
+      ],
+      "when_not_to_use": [
+        "CRUD pequeño",
+        "prototipos cortos"
+      ],
+      "complexity": "media-alta",
+      "project_types": [
+        "backend",
+        "enterprise",
+        "fullstack"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "domain|core",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "folder",
+            "examples": [
+              "src/Domain"
+            ]
+          },
+          {
+            "pattern": "application|usecases",
+            "match_type": "regex",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "src/Application"
+            ]
+          },
+          {
+            "pattern": "infrastructure",
+            "match_type": "segment",
+            "weight": 10,
+            "evidence_type": "folder",
+            "examples": [
+              "src/Infrastructure"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": ".*Command\\.(cs|ts|java)$",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "file",
+            "examples": [
+              "CreateOrderCommand.cs"
+            ]
+          },
+          {
+            "pattern": ".*Query\\.(cs|ts|java)$",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "file",
+            "examples": [
+              "GetOrderQuery.cs"
+            ]
+          },
+          {
+            "pattern": "DependencyInjection\\.(cs|ts)$",
+            "match_type": "regex",
+            "weight": 6,
+            "evidence_type": "file",
+            "examples": [
+              "DependencyInjection.cs"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "mediatr|ardalis.specification|fluentvalidation",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "dependency",
+            "examples": [
+              "MediatR"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "infrastructure->application_core",
+            "match_type": "relation",
+            "weight": 12,
+            "evidence_type": "import_graph",
+            "examples": [
+              "Infrastructure references Application"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "domain_without_framework_dependencies",
+            "match_type": "composite",
+            "weight": 15,
+            "evidence_type": "structure",
+            "examples": [
+              "Domain without ORM/web deps"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "domain->orm_or_http",
+            "match_type": "relation",
+            "weight": 18,
+            "evidence_type": "import_graph",
+            "examples": [
+              "Domain imports EF Core"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.25,
+          "files": 0.15,
+          "dependencies": 0.15,
+          "imports": 0.15,
+          "patterns": 0.3
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "Domain importando ORM",
+        "Controllers acoplados a infra"
+      ],
+      "advantages": [
+        "dominio protegido",
+        "tests baratos",
+        "infra reemplazable"
+      ],
+      "risks": [
+        "más abstracción",
+        "ceremonia excesiva"
+      ],
+      "migration_from": [
+        "layered_n_tier",
+        "mvc",
+        "traditional_monolith"
+      ],
+      "migration_to": [
+        "modular_monolith",
+        "microservices"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Core first",
+          "intent": "mostrar dependencia hacia adentro",
+          "ui_action": "círculos concéntricos y flechas ilegales"
+        }
+      ],
+      "example_folder_structure": [
+        "src/Domain",
+        "src/Application",
+        "src/Infrastructure",
+        "src/Web"
+      ],
+      "sample_repos": [
+        {
+          "name": "ardalis/CleanArchitecture",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/ardalis/CleanArchitecture"
+        },
+        {
+          "name": "jasontaylordev/CleanArchitecture",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/jasontaylordev/CleanArchitecture"
+        }
+      ],
+      "ui_hints": {
+        "diagram_type": "concentric",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "Domain",
+          "Infrastructure"
+        ]
+      },
+      "explanations": {
+        "developer": "El núcleo no depende de detalles técnicos; por eso la evidencia principal está en Domain/Application/Infrastructure.",
+        "pm": "Favorece cambios de infraestructura sin rehacer negocio.",
+        "po": "Protege las reglas críticas del producto."
+      },
+      "comparison": {
+        "scalability": "media",
+        "metadata_detectability": "alta",
+        "coupling": "bajo",
+        "operational_cost": "medio",
+        "team_fit": "mixto"
+      }
+    },
+    {
+      "id": "hexagonal_architecture",
+      "name": "Hexagonal Architecture / Ports and Adapters",
+      "aliases": [
+        "hexagonal",
+        "ports-adapters",
+        "ports and adapters"
+      ],
+      "family": "concentric_domain_core",
+      "description": "El core habla con el exterior por puertos; adaptadores implementan entradas y salidas.",
+      "when_to_use": [
+        "varias integraciones",
+        "DDD",
+        "backend desacoplado",
+        "serverless con dominio estable"
+      ],
+      "when_not_to_use": [
+        "CRUD simple",
+        "una sola interfaz sin cambios esperados"
+      ],
+      "complexity": "media-alta",
+      "project_types": [
+        "backend",
+        "serverless",
+        "enterprise"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "ports",
+            "match_type": "segment",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "src/ports"
+            ]
+          },
+          {
+            "pattern": "adapters",
+            "match_type": "segment",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "src/adapters"
+            ]
+          },
+          {
+            "pattern": "inbound|outbound|primary|secondary",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "folder",
+            "examples": [
+              "src/adapters/outbound"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": ".*Port\\.(ts|py|java|cs)$",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "file",
+            "examples": [
+              "UserRepositoryPort.ts"
+            ]
+          },
+          {
+            "pattern": ".*Adapter\\.(ts|py|java|cs)$",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "file",
+            "examples": [
+              "DynamoAdapter.py"
+            ]
+          },
+          {
+            "pattern": ".*UseCase\\.(ts|py|java|cs)$",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "file",
+            "examples": [
+              "CreateUserUseCase.ts"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "aws-lambda|dynamodb|api-gateway",
+            "match_type": "regex",
+            "weight": 4,
+            "evidence_type": "dependency",
+            "examples": [
+              "aws-lambda"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "adapters->ports",
+            "match_type": "relation",
+            "weight": 12,
+            "evidence_type": "import_graph",
+            "examples": [
+              "adapter imports port"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "domain_without_adapter_dependencies",
+            "match_type": "composite",
+            "weight": 15,
+            "evidence_type": "structure",
+            "examples": [
+              "domain isolated from adapters"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "domain->adapters",
+            "match_type": "relation",
+            "weight": 18,
+            "evidence_type": "import_graph",
+            "examples": [
+              "domain imports adapter"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.3,
+          "files": 0.2,
+          "dependencies": 0.1,
+          "imports": 0.15,
+          "patterns": 0.25
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "dominio acoplado a SDKs",
+        "puertos falsos",
+        "adaptadores hablándose entre sí"
+      ],
+      "advantages": [
+        "alto desacoplamiento",
+        "adapter swap",
+        "testabilidad"
+      ],
+      "risks": [
+        "sobreabstracción",
+        "nomenclatura compleja"
+      ],
+      "migration_from": [
+        "layered_n_tier",
+        "mvc"
+      ],
+      "migration_to": [
+        "clean_architecture",
+        "microservices",
+        "serverless_architecture"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Ports ring",
+          "intent": "mostrar entradas y salidas alrededor del core",
+          "ui_action": "hexágono con adaptadores inbound/outbound"
+        }
+      ],
+      "example_folder_structure": [
+        "src/domain",
+        "src/application",
+        "src/ports",
+        "src/adapters/http",
+        "src/adapters/persistence"
+      ],
+      "sample_repos": [
+        {
+          "name": "aws-samples/lambda-hexagonal-architecture-sample",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/aws-samples/lambda-hexagonal-architecture-sample"
+        }
+      ],
+      "ui_hints": {
+        "diagram_type": "hexagon",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "ports",
+          "adapters"
+        ]
+      },
+      "explanations": {
+        "developer": "Los detalles técnicos viven fuera del core y se conectan por contratos.",
+        "pm": "Reduce lock-in y facilita reemplazar integraciones.",
+        "po": "Sirve cuando el negocio debe sobrevivir a cambios de canales o proveedores."
+      },
+      "comparison": {
+        "scalability": "media",
+        "metadata_detectability": "media-alta",
+        "coupling": "bajo",
+        "operational_cost": "medio",
+        "team_fit": "mixto"
+      }
+    },
+    {
+      "id": "mvc",
+      "name": "MVC",
+      "aliases": [
+        "model-view-controller"
+      ],
+      "family": "presentation_patterns",
+      "description": "Separa modelos, vistas y controladores para request/response y rendering web.",
+      "when_to_use": [
+        "server-rendered web",
+        "CRUD fullstack",
+        "admin apps"
+      ],
+      "when_not_to_use": [
+        "SPA compleja",
+        "mobile UI con binding"
+      ],
+      "complexity": "baja-media",
+      "project_types": [
+        "fullstack",
+        "backend-rendered",
+        "enterprise"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "controllers",
+            "match_type": "segment",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "Controllers"
+            ]
+          },
+          {
+            "pattern": "views",
+            "match_type": "segment",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "Views"
+            ]
+          },
+          {
+            "pattern": "models",
+            "match_type": "segment",
+            "weight": 10,
+            "evidence_type": "folder",
+            "examples": [
+              "Models"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": ".*Controller\\.(cs|php|rb|java)$",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "file",
+            "examples": [
+              "HomeController.cs"
+            ]
+          },
+          {
+            "pattern": ".*\\.(cshtml|blade\\.php|erb)$",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "file",
+            "examples": [
+              "Index.cshtml"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "aspnetcore.mvc|spring-webmvc|laravel",
+            "match_type": "regex",
+            "weight": 6,
+            "evidence_type": "dependency",
+            "examples": [
+              "Microsoft.AspNetCore.Mvc"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "controllers->models",
+            "match_type": "relation",
+            "weight": 8,
+            "evidence_type": "import_graph",
+            "examples": [
+              "controller imports model"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "route_to_controller_to_view",
+            "match_type": "composite",
+            "weight": 10,
+            "evidence_type": "structure",
+            "examples": [
+              "routes + controllers + views"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "spa_components_dominant",
+            "match_type": "composite",
+            "weight": 10,
+            "evidence_type": "structure",
+            "examples": [
+              "React SPA dominates repo"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.35,
+          "files": 0.25,
+          "dependencies": 0.1,
+          "imports": 0.1,
+          "patterns": 0.2
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "fat controllers",
+        "business logic en views",
+        "domain logic en web layer"
+      ],
+      "advantages": [
+        "fácil de adoptar",
+        "convención fuerte",
+        "request flow claro"
+      ],
+      "risks": [
+        "difícil para UI rica",
+        "controllers grandes"
+      ],
+      "migration_from": [
+        "traditional_monolith"
+      ],
+      "migration_to": [
+        "layered_n_tier",
+        "frontend_component_architecture",
+        "clean_architecture"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Request flow",
+          "intent": "mostrar MVC",
+          "ui_action": "ruta -> controller -> model -> view"
+        }
+      ],
+      "example_folder_structure": [
+        "app/Controllers",
+        "app/Models",
+        "resources/views"
+      ],
+      "sample_repos": [],
+      "ui_hints": {
+        "diagram_type": "request_flow",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "Controllers"
+        ]
+      },
+      "explanations": {
+        "developer": "La convención MVC es visible por Controllers/Views/Models y rutas que terminan en rendering.",
+        "pm": "Buena para web clásica, no para independencia frontend compleja.",
+        "po": "Encaja cuando la interfaz sigue siendo mayormente server-rendered."
+      },
+      "comparison": {
+        "scalability": "media",
+        "metadata_detectability": "alta",
+        "coupling": "medio",
+        "operational_cost": "bajo",
+        "team_fit": "pequeños/mixto"
+      }
+    },
+    {
+      "id": "modular_monolith",
+      "name": "Modular Monolith",
+      "aliases": [
+        "modulith",
+        "modular monolith"
+      ],
+      "family": "modular_monolith",
+      "description": "Un solo despliegue con módulos internos fuertes y límites explícitos.",
+      "when_to_use": [
+        "producto en crecimiento",
+        "preparar extracción por dominio",
+        "reducir complejidad operativa"
+      ],
+      "when_not_to_use": [
+        "deploy independiente ya requerido",
+        "aislamiento regulatorio fuerte"
+      ],
+      "complexity": "media-alta",
+      "project_types": [
+        "backend",
+        "enterprise",
+        "startup",
+        "monorepo"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "modules",
+            "match_type": "segment",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "src/modules"
+            ]
+          },
+          {
+            "pattern": "features|boundedcontexts",
+            "match_type": "regex",
+            "weight": 9,
+            "evidence_type": "folder",
+            "examples": [
+              "src/features"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": ".*ApplicationModule.*|.*Modulith.*",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "file",
+            "examples": [
+              "@ApplicationModule",
+              "modulith docs"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "spring-modulith",
+            "match_type": "regex",
+            "weight": 14,
+            "evidence_type": "dependency",
+            "examples": [
+              "spring-modulith-starter-core"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "module_a->module_b_via_api_or_events",
+            "match_type": "relation",
+            "weight": 10,
+            "evidence_type": "import_graph",
+            "examples": [
+              "module imports another via contract"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "single_deployable_many_modules",
+            "match_type": "composite",
+            "weight": 15,
+            "evidence_type": "structure",
+            "examples": [
+              "one runtime + many modules"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "many_independent_deployables",
+            "match_type": "composite",
+            "weight": 20,
+            "evidence_type": "structure",
+            "examples": [
+              "multiple services with separate Dockerfiles"
+            ]
+          },
+          {
+            "pattern": "cross_module_direct_access",
+            "match_type": "relation",
+            "weight": 15,
+            "evidence_type": "import_graph",
+            "examples": [
+              "module bypasses contract"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.25,
+          "files": 0.1,
+          "dependencies": 0.15,
+          "imports": 0.2,
+          "patterns": 0.3
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "common gigante",
+        "módulos nominales",
+        "joins o imports cruzados"
+      ],
+      "advantages": [
+        "simplicidad operativa",
+        "modularidad",
+        "buen paso previo a microservices"
+      ],
+      "risks": [
+        "falsa modularidad",
+        "sobreuso de shared kernel"
+      ],
+      "migration_from": [
+        "traditional_monolith",
+        "layered_n_tier"
+      ],
+      "migration_to": [
+        "microservices",
+        "event_driven_architecture"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Module map",
+          "intent": "mostrar límites y ownership",
+          "ui_action": "cajas por módulo, contratos y eventos"
+        }
+      ],
+      "example_folder_structure": [
+        "src/modules/catalog/application",
+        "src/modules/catalog/domain",
+        "src/modules/orders/application",
+        "src/modules/orders/domain"
+      ],
+      "sample_repos": [
+        {
+          "name": "spring-petclinic/spring-petclinic-modulith",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/spring-petclinic/spring-petclinic-modulith"
+        },
+        {
+          "name": "sivaprasadreddy/spring-modular-monolith",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/sivaprasadreddy/spring-modular-monolith"
+        }
+      ],
+      "ui_hints": {
+        "diagram_type": "module_boxes",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "common",
+          "cross-module edges"
+        ]
+      },
+      "explanations": {
+        "developer": "Vemos módulos de dominio dentro de un único deployable; eso sugiere un monolito modular, no microservices.",
+        "pm": "Mantiene la simplicidad operativa mientras mejora ownership interno.",
+        "po": "Suele ser el mejor siguiente paso antes de distribuir el sistema."
+      },
+      "comparison": {
+        "scalability": "media-alta",
+        "metadata_detectability": "media",
+        "coupling": "bajo",
+        "operational_cost": "medio",
+        "team_fit": "mixto/empresa"
+      }
+    },
+    {
+      "id": "microservices",
+      "name": "Microservices",
+      "aliases": [
+        "microservices architecture",
+        "service-per-capability"
+      ],
+      "family": "distributed_services",
+      "description": "Descompone el sistema en servicios independientes, usualmente con datos y despliegue propios.",
+      "when_to_use": [
+        "equipos autónomos",
+        "deploy independiente",
+        "escalado desigual",
+        "dominios separados"
+      ],
+      "when_not_to_use": [
+        "producto temprano",
+        "equipo pequeño",
+        "sin necesidad de independencia operacional"
+      ],
+      "complexity": "alta",
+      "project_types": [
+        "backend",
+        "enterprise",
+        "platform",
+        "monorepo",
+        "multi-repo"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "services|apps",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "folder",
+            "examples": [
+              "services/catalog",
+              "apps/orders-service"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": "Dockerfile",
+            "match_type": "exact_name",
+            "weight": 6,
+            "evidence_type": "file",
+            "examples": [
+              "services/catalog/Dockerfile"
+            ]
+          },
+          {
+            "pattern": "helm|kustomize|deployment\\.ya?ml",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "file",
+            "examples": [
+              "deploy/orders/helm"
+            ]
+          },
+          {
+            "pattern": "openapi|proto",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "file",
+            "examples": [
+              "catalog.proto"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "grpc|kubernetes|istio|service-bus|rabbitmq|opentelemetry",
+            "match_type": "regex",
+            "weight": 8,
+            "evidence_type": "dependency",
+            "examples": [
+              "grpc",
+              "opentelemetry"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "service_local_boundary",
+            "match_type": "composite",
+            "weight": 10,
+            "evidence_type": "import_graph",
+            "examples": [
+              "few cross-service code imports"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "multiple_deployables_with_service_specific_manifests",
+            "match_type": "composite",
+            "weight": 18,
+            "evidence_type": "structure",
+            "examples": [
+              "many services each with deploy files"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "single_deployable_many_modules",
+            "match_type": "composite",
+            "weight": 20,
+            "evidence_type": "structure",
+            "examples": [
+              "one runtime only"
+            ]
+          },
+          {
+            "pattern": "shared_database_for_everything",
+            "match_type": "composite",
+            "weight": 15,
+            "evidence_type": "structure",
+            "examples": [
+              "central db module reused by all services"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.15,
+          "files": 0.25,
+          "dependencies": 0.15,
+          "imports": 0.1,
+          "patterns": 0.35
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "shared DB",
+        "giant shared lib",
+        "distributed monolith"
+      ],
+      "advantages": [
+        "deploy independiente",
+        "escala por capacidad",
+        "alineación por dominio"
+      ],
+      "risks": [
+        "operación compleja",
+        "observabilidad distribuida",
+        "consistencia eventual"
+      ],
+      "migration_from": [
+        "modular_monolith",
+        "traditional_monolith",
+        "soa"
+      ],
+      "migration_to": [
+        "event_driven_architecture",
+        "serverless_architecture",
+        "bff"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Service map",
+          "intent": "mostrar ownership y dependencia",
+          "ui_action": "grafo de servicios con stores y edges sync/async"
+        }
+      ],
+      "example_folder_structure": [
+        "services/catalog",
+        "services/orders",
+        "services/payments",
+        "deploy/catalog",
+        "deploy/orders"
+      ],
+      "sample_repos": [
+        {
+          "name": "GoogleCloudPlatform/microservices-demo",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/GoogleCloudPlatform/microservices-demo"
+        },
+        {
+          "name": "dotnet-architecture/eShopOnContainers",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/dotnet-architecture/eShopOnContainers"
+        }
+      ],
+      "ui_hints": {
+        "diagram_type": "service_graph",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "shared libs",
+          "shared db",
+          "hub services"
+        ]
+      },
+      "explanations": {
+        "developer": "Hay múltiples deployables con manifests y contratos específicos por servicio; eso es evidencia fuerte de microservices.",
+        "pm": "Aumenta autonomía y costo operativo al mismo tiempo.",
+        "po": "Conviene en productos grandes con equipos y dominios claramente separables."
+      },
+      "comparison": {
+        "scalability": "alta",
+        "metadata_detectability": "alta",
+        "coupling": "bajo",
+        "operational_cost": "alto",
+        "team_fit": "empresa"
+      }
+    },
+    {
+      "id": "serverless_architecture",
+      "name": "Serverless Architecture",
+      "aliases": [
+        "serverless",
+        "faas",
+        "functions"
+      ],
+      "family": "cloud_native",
+      "description": "Construye capacidades sobre servicios gestionados y funciones/eventos sin administrar servidores directamente.",
+      "when_to_use": [
+        "automations",
+        "APIs ligeras",
+        "triggers por evento",
+        "backends móviles o web"
+      ],
+      "when_not_to_use": [
+        "control fino del entorno",
+        "latencia ultrabaja sostenida",
+        "migración sin cambios arquitectónicos"
+      ],
+      "complexity": "media-alta",
+      "project_types": [
+        "backend",
+        "integration",
+        "data",
+        "startup",
+        "cloud-native"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "functions|lambdas|handlers|events|stepfunctions|workflows",
+            "match_type": "regex",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "functions/createOrder"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": "serverless\\.yml|template\\.ya?ml|function\\.json",
+            "match_type": "regex",
+            "weight": 18,
+            "evidence_type": "file",
+            "examples": [
+              "serverless.yml",
+              "template.yaml"
+            ]
+          },
+          {
+            "pattern": "handler\\.(ts|js|py|cs)$",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "file",
+            "examples": [
+              "handler.ts"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "aws-lambda|azure-functions|google-cloud-functions|cloud-run|step-functions",
+            "match_type": "regex",
+            "weight": 10,
+            "evidence_type": "dependency",
+            "examples": [
+              "aws-lambda"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "function_to_managed_services",
+            "match_type": "composite",
+            "weight": 8,
+            "evidence_type": "import_graph",
+            "examples": [
+              "functions call managed DB/queue APIs"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "many_small_functions_with_triggers",
+            "match_type": "composite",
+            "weight": 14,
+            "evidence_type": "structure",
+            "examples": [
+              "many handlers + infra templates"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "single_god_function",
+            "match_type": "composite",
+            "weight": 10,
+            "evidence_type": "structure",
+            "examples": [
+              "one huge lambda handles all routes"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.2,
+          "files": 0.3,
+          "dependencies": 0.2,
+          "imports": 0.1,
+          "patterns": 0.2
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "god lambda",
+        "timeout-sensitive workloads impropias",
+        "hidden coupling via shared DB"
+      ],
+      "advantages": [
+        "menos operación",
+        "autoscaling",
+        "pay-per-use"
+      ],
+      "risks": [
+        "límites de plataforma",
+        "cold starts",
+        "lock-in"
+      ],
+      "migration_from": [
+        "traditional_monolith",
+        "microservices"
+      ],
+      "migration_to": [
+        "event_driven_architecture",
+        "pipeline_architecture",
+        "bff"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Trigger map",
+          "intent": "mostrar triggers y funciones",
+          "ui_action": "evento/API -> función -> managed services"
+        }
+      ],
+      "example_folder_structure": [
+        "functions/createOrder",
+        "functions/processPayment",
+        "infra/template.yaml",
+        "events/"
+      ],
+      "sample_repos": [
+        {
+          "name": "aws-samples/serverless-patterns",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/aws-samples/serverless-patterns"
+        },
+        {
+          "name": "GoogleCloudPlatform/serverless-store-demo",
+          "kind": "repo",
+          "ref_type": "github",
+          "url_or_slug": "github.com/GoogleCloudPlatform/serverless-store-demo"
+        }
+      ],
+      "ui_hints": {
+        "diagram_type": "trigger_graph",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "god function",
+          "high fan-out triggers"
+        ]
+      },
+      "explanations": {
+        "developer": "La evidencia principal está en functions/handlers y en los manifests serverless.",
+        "pm": "Reduce operación, pero exige vigilar límites y observabilidad.",
+        "po": "Excelente para automatización y cargas variables; no siempre conviene para todo el sistema."
+      },
+      "comparison": {
+        "scalability": "alta",
+        "metadata_detectability": "alta",
+        "coupling": "bajo-medio",
+        "operational_cost": "medio",
+        "team_fit": "mixto"
+      }
+    },
+    {
+      "id": "microfrontends",
+      "name": "Microfrontends",
+      "aliases": [
+        "micro-frontends",
+        "mfe",
+        "frontend decomposition"
+      ],
+      "family": "frontend_composition",
+      "description": "Divide el frontend en remotes o secciones independientes, normalmente compuestas por un shell o contenedor.",
+      "when_to_use": [
+        "frontend grande",
+        "equipos múltiples",
+        "deploy independiente por dominio"
+      ],
+      "when_not_to_use": [
+        "frontend pequeño",
+        "un solo equipo",
+        "sin necesidad real de independencia"
+      ],
+      "complexity": "alta",
+      "project_types": [
+        "frontend",
+        "enterprise",
+        "monorepo"
+      ],
+      "detection": {
+        "folders": [
+          {
+            "pattern": "shell|host|container|remote-",
+            "match_type": "regex",
+            "weight": 12,
+            "evidence_type": "folder",
+            "examples": [
+              "apps/shell",
+              "apps/catalog-remote"
+            ]
+          },
+          {
+            "pattern": "apps",
+            "match_type": "segment",
+            "weight": 6,
+            "evidence_type": "folder",
+            "examples": [
+              "apps/checkout-remote"
+            ]
+          }
+        ],
+        "files": [
+          {
+            "pattern": "module-federation|remoteEntry|import-map|single-spa",
+            "match_type": "regex",
+            "weight": 18,
+            "evidence_type": "file",
+            "examples": [
+              "module-federation.config.js",
+              "remoteEntry.js"
+            ]
+          }
+        ],
+        "dependencies": [
+          {
+            "pattern": "single-spa|@module-federation|webpack.*federation|nx",
+            "match_type": "regex",
+            "weight": 14,
+            "evidence_type": "dependency",
+            "examples": [
+              "single-spa",
+              "@module-federation/enhanced"
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "pattern": "shell_loads_remotes",
+            "match_type": "composite",
+            "weight": 10,
+            "evidence_type": "import_graph",
+            "examples": [
+              "shell imports remote definitions"
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "pattern": "many_frontend_apps_one_shell",
+            "match_type": "composite",
+            "weight": 16,
+            "evidence_type": "structure",
+            "examples": [
+              "shell + remotes + shared-ui"
+            ]
+          }
+        ],
+        "negative_signals": [
+          {
+            "pattern": "single_spa_bundle_without_remotes",
+            "match_type": "composite",
+            "weight": 16,
+            "evidence_type": "structure",
+            "examples": [
+              "one SPA only"
+            ]
+          },
+          {
+            "pattern": "cross_mfe_direct_imports",
+            "match_type": "relation",
+            "weight": 12,
+            "evidence_type": "import_graph",
+            "examples": [
+              "one remote imports another directly"
+            ]
+          }
+        ],
+        "weight_map": {
+          "folders": 0.2,
+          "files": 0.25,
+          "dependencies": 0.2,
+          "imports": 0.1,
+          "patterns": 0.25
+        },
+        "max_score": 100
+      },
+      "bad_smells": [
+        "shared global state",
+        "cross-imports",
+        "host demasiado inteligente"
+      ],
+      "advantages": [
+        "autonomía de equipos",
+        "deploy independiente",
+        "alineación por dominio"
+      ],
+      "risks": [
+        "costo operativo alto",
+        "shared dependency conflicts",
+        "coordination overhead"
+      ],
+      "migration_from": [
+        "frontend_component_architecture",
+        "mvc"
+      ],
+      "migration_to": [
+        "bff",
+        "microservices"
+      ],
+      "visual_refactors": [
+        {
+          "title": "Shell + remotes",
+          "intent": "mostrar composición frontend",
+          "ui_action": "shell central con remotes y shared libs"
+        }
+      ],
+      "example_folder_structure": [
+        "apps/shell",
+        "apps/catalog-remote",
+        "apps/checkout-remote",
+        "packages/shared-ui"
+      ],
+      "sample_repos": [
+        {
+          "name": "single-spa official examples",
+          "kind": "docs",
+          "ref_type": "examples",
+          "url_or_slug": "single-spa docs/examples"
+        },
+        {
+          "name": "webpack Module Federation docs",
+          "kind": "docs",
+          "ref_type": "official",
+          "url_or_slug": "webpack module federation docs"
+        }
+      ],
+      "ui_hints": {
+        "diagram_type": "shell_remotes",
+        "show_dependency_direction": true,
+        "highlight_hotspots": [
+          "shared-ui",
+          "remote coupling"
+        ]
+      },
+      "explanations": {
+        "developer": "La evidencia fuerte está en shell/remotes y en la configuración de federation o single-spa.",
+        "pm": "Aumenta autonomía del frontend, pero también coordinación y operación.",
+        "po": "Solo conviene cuando el frontend ya necesita ownership real por dominio."
+      },
+      "comparison": {
+        "scalability": "alta",
+        "metadata_detectability": "alta",
+        "coupling": "medio",
+        "operational_cost": "alto",
+        "team_fit": "empresa"
+      }
+    }
+  ],
+  "global_rules": {
+    "confidence_thresholds": {
+      "low": 34,
+      "tentative": 59,
+      "medium": 79,
+      "high": 100
+    },
+    "family_conflicts": [
+      {
+        "family": "concentric_domain_core",
+        "members": [
+          "clean_architecture",
+          "hexagonal_architecture",
+          "onion_architecture"
+        ],
+        "tie_delta": 8,
+        "resolution_order": [
+          "explicit_alias",
+          "folder_vocabulary",
+          "structural_pattern"
+        ]
+      }
+    ],
+    "composite_labeling": [
+      {
+        "primary_candidates": [
+          "microservices",
+          "modular_monolith",
+          "traditional_monolith"
+        ],
+        "secondary_candidates": [
+          "ddd",
+          "cqrs",
+          "event_driven_architecture"
+        ]
+      },
+      {
+        "primary_candidates": [
+          "frontend_component_architecture",
+          "microfrontends"
+        ],
+        "secondary_candidates": [
+          "bff"
+        ]
+      }
+    ]
+  }
+}

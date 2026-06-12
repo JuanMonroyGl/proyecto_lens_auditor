@@ -886,12 +886,13 @@ function ArchitectureTab({ scan }) {
   const layers = insights?.layers ?? [];
   const files = scan.files ?? [];
   const firstLayerId = layers[0]?.id ?? "";
+  const [architectureView, setArchitectureView] = useState("explorer");
   const [expandedLayerId, setExpandedLayerId] = useState(firstLayerId);
   const [selectedItem, setSelectedItem] = useState({ type: "layer", id: firstLayerId });
   const [filePageByLayer, setFilePageByLayer] = useState({});
-  const [selectedArchitectureTarget, setSelectedArchitectureTarget] = useState(
-    insights?.recommendedPattern?.name ?? insights?.architectureOptions?.[0]?.name ?? ""
-  );
+  const architectureTargets = getArchitectureTargets(insights);
+  const defaultTargetId = getTargetValue(architectureTargets[0] ?? insights?.recommendedPattern ?? null);
+  const [selectedArchitectureTargetId, setSelectedArchitectureTargetId] = useState(defaultTargetId);
   const filesByLayer = useMemo(() => groupFilesByLayer(files), [files]);
 
   useEffect(() => {
@@ -914,9 +915,10 @@ function ArchitectureTab({ scan }) {
   }, [expandedLayerId, files, firstLayerId, layers, selectedItem.id, selectedItem.type]);
 
   useEffect(() => {
-    setSelectedArchitectureTarget(insights?.recommendedPattern?.name ?? insights?.architectureOptions?.[0]?.name ?? "");
+    setSelectedArchitectureTargetId(getTargetValue(architectureTargets[0] ?? insights?.recommendedPattern ?? null));
     setFilePageByLayer({});
-  }, [insights]);
+    setArchitectureView("explorer");
+  }, [architectureTargets, insights]);
 
   if (!insights) {
     return (
@@ -926,6 +928,8 @@ function ArchitectureTab({ scan }) {
     );
   }
 
+  const primaryArchitecture = getPrimaryArchitecture(insights);
+  const secondaryArchitectures = insights.secondaryArchitectures ?? [];
   const expandedLayer = layers.find((layer) => layer.id === expandedLayerId) ?? layers[0];
   const selectedDetail = buildArchitectureDetail({
     files,
@@ -933,6 +937,11 @@ function ArchitectureTab({ scan }) {
     relations: insights.relations ?? [],
     selectedItem
   });
+  const selectedTarget =
+    architectureTargets.find((option) => getTargetValue(option) === selectedArchitectureTargetId) ??
+    architectureTargets[0] ??
+    insights.recommendedPattern;
+  const selectedTargetId = getTargetValue(selectedTarget);
   const selectLayer = (layer) => {
     setExpandedLayerId(layer.id);
     setSelectedItem({ type: "layer", id: layer.id });
@@ -946,116 +955,311 @@ function ArchitectureTab({ scan }) {
       [layerId]: ((nextPage % totalPages) + totalPages) % totalPages
     }));
   };
-  const selectedTarget =
-    insights.architectureOptions?.find((option) => option.name === selectedArchitectureTarget) ??
-    insights.recommendedPattern ??
-    insights.architectureOptions?.[0];
 
   return (
     <>
       <section className="architecture-hero">
         <div>
-          <p className="eyebrow">Arquitectura</p>
-          <h2>Lectura simple del proyecto</h2>
-          <p>{insights.summary}</p>
+          <p className="eyebrow">Architecture Explorer</p>
+          <h2>{primaryArchitecture.name}</h2>
+          <p>{primaryArchitecture.description ?? insights.summary}</p>
         </div>
         <div className="architecture-stack">
-          {(insights.stack?.length ? insights.stack : ["Inferido localmente"]).map((item) => (
+          <span>Confianza {primaryArchitecture.confidence ?? "media"}</span>
+          <span>Score {formatArchitectureScore(primaryArchitecture.score)}</span>
+          {(insights.stack?.length ? insights.stack : ["Metadata local"]).map((item) => (
             <span key={item}>{item}</span>
           ))}
         </div>
       </section>
 
-      <ArchitecturePatternPanel
-        options={insights.architectureOptions ?? []}
-        pattern={insights.pattern}
-        selectedTarget={selectedArchitectureTarget}
-        setSelectedTarget={setSelectedArchitectureTarget}
-      />
+      <ArchitectureViewTabs activeView={architectureView} setActiveView={setArchitectureView} />
 
-      {selectedTarget ? <ArchitectureMigrationPreview target={selectedTarget} /> : null}
-
-      <ArchitectureJourney flow={insights.flow ?? []} />
-
-      <section className="architecture-explorer">
-        <div className="architecture-map-panel">
-          <div className="architecture-map-heading">
-            <div>
-              <p className="eyebrow">Explorer</p>
-              <h2>Mapa de capas</h2>
-            </div>
-            <span>{formatNumber(layers.length)} zonas detectadas</span>
-          </div>
-
-          <ArchitectureMap
-            expandedLayerId={expandedLayer?.id ?? ""}
-            filePageByLayer={filePageByLayer}
-            filesByLayer={filesByLayer}
-            layers={layers}
-            onFilePageChange={changeFilePage}
-            onFileSelect={selectFile}
-            onLayerSelect={selectLayer}
-            relations={insights.relations ?? []}
-            selectedItem={selectedItem}
+      {architectureView === "explorer" ? (
+        <>
+          <ArchitecturePatternPanel
+            insights={insights}
+            matches={insights.architectureMatches ?? []}
+            pattern={insights.pattern}
+            primary={primaryArchitecture}
+            secondary={secondaryArchitectures}
           />
-        </div>
 
-        <ArchitectureDetailPanel detail={selectedDetail} onFileSelect={selectFile} />
-      </section>
+          <ArchitectureDiagramCard
+            layers={layers}
+            primary={primaryArchitecture}
+            relations={insights.relations ?? []}
+          />
+
+          <ArchitectureJourney flow={insights.flow ?? []} />
+
+          <section className="architecture-explorer">
+            <div className="architecture-map-panel">
+              <div className="architecture-map-heading">
+                <div>
+                  <p className="eyebrow">Mapa vivo</p>
+                  <h2>Capas y carpetas principales</h2>
+                </div>
+                <span>{formatNumber(layers.length)} zonas detectadas</span>
+              </div>
+
+              <ArchitectureMap
+                expandedLayerId={expandedLayer?.id ?? ""}
+                filePageByLayer={filePageByLayer}
+                filesByLayer={filesByLayer}
+                layers={layers}
+                onFilePageChange={changeFilePage}
+                onFileSelect={selectFile}
+                onLayerSelect={selectLayer}
+                relations={insights.relations ?? []}
+                selectedItem={selectedItem}
+              />
+            </div>
+
+            <ArchitectureDetailPanel detail={selectedDetail} onFileSelect={selectFile} />
+          </section>
+        </>
+      ) : null}
+
+      {architectureView === "evidence" ? <ArchitectureEvidenceView insights={insights} /> : null}
+
+      {architectureView === "migration" ? (
+        <ArchitectureMigrationView
+          migrationPaths={insights.migrationPaths ?? []}
+          selectedTarget={selectedTarget}
+          selectedTargetId={selectedTargetId}
+          setSelectedTargetId={setSelectedArchitectureTargetId}
+          targets={architectureTargets}
+        />
+      ) : null}
     </>
   );
 }
 
-function ArchitecturePatternPanel({ options, pattern, selectedTarget, setSelectedTarget }) {
-  if (!pattern) {
-    return null;
-  }
+function ArchitectureViewTabs({ activeView, setActiveView }) {
+  const views = [
+    { id: "explorer", label: "Explorer", icon: <MapIcon size={15} /> },
+    { id: "evidence", label: "Evidence", icon: <ShieldCheck size={15} /> },
+    { id: "migration", label: "Migration", icon: <GitBranch size={15} /> }
+  ];
+
+  return (
+    <div className="architecture-view-tabs" role="tablist" aria-label="Vistas de arquitectura">
+      {views.map((view) => (
+        <button
+          className={activeView === view.id ? "active" : ""}
+          key={view.id}
+          onClick={() => setActiveView(view.id)}
+          type="button"
+        >
+          {view.icon}
+          <span>{view.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ArchitecturePatternPanel({ insights, matches, pattern, primary, secondary }) {
+  const risks = primary.risks?.length ? primary.risks : pattern?.risks ?? [];
 
   return (
     <section className="architecture-pattern-panel">
       <div className="architecture-pattern-card">
-        <p className="eyebrow">Arquitectura detectada</p>
-        <h2>{pattern.name}</h2>
-        <p>{pattern.summary}</p>
+        <p className="eyebrow">Arquitectura primaria</p>
+        <h2>{primary.name}</h2>
+        <p>{getArchitectureAudienceCopy(primary, insights.summary)}</p>
         <div className="pattern-badges">
-          <span>confianza {pattern.confidence}</span>
-          <span>{formatNumber(pattern.evidence?.length ?? 0)} senales</span>
+          <span>confianza {primary.confidence ?? "media"}</span>
+          <span>score {formatArchitectureScore(primary.score)}</span>
+          <span>{primary.family ?? "familia mixta"}</span>
         </div>
       </div>
 
       <div className="architecture-evidence-card">
-        <strong>Evidencia</strong>
-        <div>
-          {(pattern.evidence ?? []).slice(0, 4).map((item) => (
-            <span key={item}>{item}</span>
+        <strong>Secundarias razonables</strong>
+        <div className="architecture-secondary-list">
+          {(secondary.length ? secondary : matches.slice(1, 4)).map((item) => (
+            <span key={item.id ?? item.name}>
+              {item.name} <em>{formatArchitectureScore(item.score)}</em>
+            </span>
           ))}
+          {secondary.length === 0 && matches.length <= 1 ? <span>Sin secundarias fuertes</span> : null}
         </div>
       </div>
 
-      <label className="architecture-target-picker">
-        <span>Arquitectura objetivo</span>
-        <select value={selectedTarget} onChange={(event) => setSelectedTarget(event.target.value)}>
-          {options.map((option) => (
-            <option key={option.id} value={option.name}>
-              {option.name} - ajuste {option.fit}
-            </option>
+      <div className="architecture-evidence-card">
+        <strong>Riesgos a vigilar</strong>
+        <div className="architecture-risk-list">
+          {(risks.length ? risks : ["Validar limites entre capas antes de proponer una migracion."]).slice(0, 4).map((risk) => (
+            <span key={risk}>{risk}</span>
           ))}
-        </select>
-      </label>
+        </div>
+      </div>
     </section>
   );
 }
 
-function ArchitectureMigrationPreview({ target }) {
-  const phases = target.phases ?? [];
+function ArchitectureDiagramCard({ layers, primary, relations }) {
+  const visibleLayers = layers.slice(0, 6);
+  const diagramType = primary.uiHints?.diagram_type ?? primary.uiHints?.diagramType ?? "layers";
+
+  return (
+    <section className="architecture-diagram-card">
+      <div>
+        <p className="eyebrow">Diagrama sugerido</p>
+        <h2>{getDiagramTitle(diagramType)}</h2>
+        <p>{getDiagramCopy(diagramType, primary.name)}</p>
+      </div>
+      <div className="diagram-node-row" aria-label="Resumen visual de capas">
+        {visibleLayers.map((layer, index) => {
+          const LayerIcon = getLayerIcon(layer.label);
+
+          return (
+            <article className="diagram-node" key={layer.id}>
+              <span><LayerIcon size={17} /></span>
+              <strong>{layer.label}</strong>
+              <em>{formatNumber(layer.files)} archivos</em>
+              {index < visibleLayers.length - 1 ? <i aria-hidden="true" /> : null}
+            </article>
+          );
+        })}
+      </div>
+      <div className="diagram-relation-strip">
+        {relations.slice(0, 4).map((relation) => (
+          <span key={`${relation.from}-${relation.to}`}>
+            {relation.from} -&gt; {relation.to}
+            <em>{formatNumber(relation.count)}</em>
+          </span>
+        ))}
+        {relations.length === 0 ? <span>Sin relaciones internas fuertes detectadas</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function ArchitectureEvidenceView({ insights }) {
+  const matches = insights.architectureMatches ?? [];
+  const positiveSignals = getArchitectureSignals(insights.evidence ?? insights.pattern?.evidence ?? []);
+  const negativeSignals = getArchitectureSignals(insights.contradictions ?? []);
+
+  return (
+    <section className="architecture-evidence-board">
+      <div className="architecture-match-summary">
+        <div>
+          <p className="eyebrow">Evidence</p>
+          <h2>Por que Project Lens cree esto</h2>
+          <p>Los scores se calculan con carpetas, archivos, dependencias, imports resumidos, capas y relaciones. Si una senal contradice una arquitectura, queda visible aqui.</p>
+        </div>
+        <div className="signal-cloud compact">
+          {positiveSignals.slice(0, 5).map((signal) => (
+            <SignalChip key={`positive-${signal.key}`} signal={signal} />
+          ))}
+          {negativeSignals.slice(0, 5).map((signal) => (
+            <SignalChip key={`negative-${signal.key}`} negative signal={signal} />
+          ))}
+        </div>
+      </div>
+
+      <div className="architecture-match-grid">
+        {matches.map((match) => (
+          <article className="architecture-match-card" key={match.id}>
+            <header>
+              <div>
+                <strong>{match.name}</strong>
+                <span>{match.family ?? "familia mixta"}</span>
+              </div>
+              <em>{formatArchitectureScore(match.score)}</em>
+            </header>
+            <p>{match.description}</p>
+            <div className="match-signal-columns">
+              <div>
+                <strong>Senales</strong>
+                <div className="signal-cloud">
+                  {getArchitectureSignals(match.evidence ?? []).slice(0, 5).map((signal) => (
+                    <SignalChip key={signal.key} signal={signal} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <strong>Contradicciones</strong>
+                <div className="signal-cloud">
+                  {getArchitectureSignals(match.contradictions ?? []).slice(0, 4).map((signal) => (
+                    <SignalChip key={signal.key} negative signal={signal} />
+                  ))}
+                  {(match.contradictions ?? []).length === 0 ? <span className="empty-inline">Sin choques claros</span> : null}
+                </div>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SignalChip({ negative = false, signal }) {
+  return (
+    <span className={negative ? "signal-chip negative" : "signal-chip"} title={signal.location}>
+      <strong>{signal.label}</strong>
+      {signal.weight ? <em>peso {signal.weight}</em> : null}
+    </span>
+  );
+}
+
+function ArchitectureMigrationView({ migrationPaths, selectedTarget, selectedTargetId, setSelectedTargetId, targets }) {
+  const selectedPath = migrationPaths.find((path) => path.to === selectedTarget?.id || path.toName === selectedTarget?.name);
+
+  return (
+    <section className="migration-board">
+      <div className="migration-board-heading">
+        <div>
+          <p className="eyebrow">Migration</p>
+          <h2>Plan visual sin modificar archivos</h2>
+          <p>La idea es mostrar como se veria el cambio de arquitectura por fases, usando evidencia del scan y manteniendo el proyecto intacto.</p>
+        </div>
+        <label className="architecture-target-picker inline">
+          <span>Arquitectura destino</span>
+          <select value={selectedTargetId} onChange={(event) => setSelectedTargetId(event.target.value)}>
+            {targets.map((option) => (
+              <option key={getTargetValue(option)} value={getTargetValue(option)}>
+                {option.name} - ajuste {option.fit ?? option.confidence ?? "medio"}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {selectedTarget ? <ArchitectureMigrationPreview path={selectedPath} target={selectedTarget} /> : null}
+
+      <div className="migration-target-grid">
+        {targets.map((target) => (
+          <button
+            className={getTargetValue(target) === selectedTargetId ? "migration-target-card active" : "migration-target-card"}
+            key={getTargetValue(target)}
+            onClick={() => setSelectedTargetId(getTargetValue(target))}
+            type="button"
+          >
+            <span>{target.diagramType ?? target.diagram_type ?? "layers"}</span>
+            <strong>{target.name}</strong>
+            <em>{target.reason ?? target.bestFor ?? "Ruta arquitectonica sugerida"}</em>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ArchitectureMigrationPreview({ path, target }) {
+  const phases = path?.phases ?? target.phases ?? [];
 
   return (
     <section className="architecture-migration-preview">
       <div>
         <p className="eyebrow">Cambio visual propuesto</p>
         <h2>{target.name}</h2>
-        <p>{target.reason}</p>
-        <span>{target.bestFor}</span>
+        <p>{target.reason ?? target.description ?? "Project Lens propone esta arquitectura como destino posible segun las senales del scan."}</p>
+        <span>{target.bestFor ?? target.fit ?? "Plan por fases"}</span>
       </div>
       <div className="migration-phase-row">
         {phases.map((phase, index) => (
@@ -1070,6 +1274,114 @@ function ArchitectureMigrationPreview({ target }) {
       </div>
     </section>
   );
+}
+
+function getArchitectureTargets(insights) {
+  if (!insights) {
+    return [];
+  }
+
+  if (Array.isArray(insights.recommendedArchitectureTargets) && insights.recommendedArchitectureTargets.length > 0) {
+    return insights.recommendedArchitectureTargets;
+  }
+
+  return insights.architectureOptions ?? [];
+}
+
+function getTargetValue(target) {
+  return target?.id ?? target?.name ?? "";
+}
+
+function getPrimaryArchitecture(insights) {
+  if (insights?.primaryArchitecture) {
+    return insights.primaryArchitecture;
+  }
+
+  const pattern = insights?.pattern ?? {};
+
+  return {
+    id: pattern.id ?? "legacy-pattern",
+    name: pattern.name ?? "Arquitectura mixta detectada",
+    confidence: pattern.confidence ?? "media",
+    description: pattern.summary ?? insights?.summary,
+    evidence: (pattern.evidence ?? []).map((item) => ({ label: item, weight: 1 })),
+    risks: [],
+    score: pattern.confidence === "alta" ? 72 : pattern.confidence === "baja" ? 24 : 45,
+    uiHints: { diagram_type: "layers" }
+  };
+}
+
+function getArchitectureAudienceCopy(primary, fallback) {
+  return (
+    primary.explanations?.product_owner ??
+    primary.explanations?.project_manager ??
+    primary.explanations?.developer ??
+    primary.description ??
+    fallback ??
+    "Lectura inferida a partir de metadata, rutas y relaciones internas."
+  );
+}
+
+function getArchitectureSignals(items) {
+  return (items ?? []).map((item, index) => {
+    if (typeof item === "string") {
+      return {
+        key: `${item}-${index}`,
+        label: item,
+        location: "scan",
+        weight: 1
+      };
+    }
+
+    const label = item.label ?? item.pattern ?? item.location ?? item.type ?? "Senal detectada";
+
+    return {
+      key: `${label}-${item.location ?? index}`,
+      label,
+      location: item.location ?? item.source ?? "scan",
+      weight: item.weight
+    };
+  });
+}
+
+function formatArchitectureScore(score) {
+  return Number.isFinite(Number(score)) ? `${Math.round(Number(score))}/100` : "n/a";
+}
+
+function getDiagramTitle(type) {
+  const normalized = String(type ?? "").toLowerCase();
+
+  if (normalized.includes("hexagonal")) {
+    return "Nucleo con puertos alrededor";
+  }
+
+  if (normalized.includes("services")) {
+    return "Servicios conectados por contratos";
+  }
+
+  if (normalized.includes("vertical")) {
+    return "Modulos por capacidad";
+  }
+
+  if (normalized.includes("frontend")) {
+    return "Experiencias frontend federadas";
+  }
+
+  return "Capas conectadas";
+}
+
+function getDiagramCopy(type, architectureName) {
+  const normalized = String(type ?? "").toLowerCase();
+
+  if (normalized.includes("hexagonal")) {
+    return `Para ${architectureName}, conviene mostrar entradas y salidas alrededor de la logica central.`;
+  }
+
+  if (normalized.includes("services")) {
+    return `Para ${architectureName}, lo importante es ver limites, contratos y dependencias entre partes.`;
+  }
+
+  return `Para ${architectureName}, el mapa prioriza capas, archivos clave y conexiones suaves.`;
 }
 
 function ArchitectureJourney({ flow }) {
@@ -1713,16 +2025,19 @@ function SnapshotsTab({
 }
 
 function RecommendationsTab({ scan }) {
-  const architectureOptions = scan.architectureInsights?.architectureOptions ?? [];
-  const [targetArchitecture, setTargetArchitecture] = useState(
-    scan.architectureInsights?.recommendedPattern?.name ?? architectureOptions[0]?.name ?? ""
-  );
+  const architectureOptions = getArchitectureTargets(scan.architectureInsights);
+  const defaultTargetId = getTargetValue(architectureOptions[0] ?? scan.architectureInsights?.recommendedPattern ?? null);
+  const [targetArchitectureId, setTargetArchitectureId] = useState(defaultTargetId);
   const [aiAdvice, setAiAdvice] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const selectedTarget =
+    architectureOptions.find((option) => getTargetValue(option) === targetArchitectureId) ??
+    architectureOptions[0] ??
+    scan.architectureInsights?.recommendedPattern;
 
   useEffect(() => {
-    setTargetArchitecture(scan.architectureInsights?.recommendedPattern?.name ?? architectureOptions[0]?.name ?? "");
+    setTargetArchitectureId(getTargetValue(architectureOptions[0] ?? scan.architectureInsights?.recommendedPattern ?? null));
     setAiAdvice(null);
     setAiError("");
   }, [architectureOptions, scan]);
@@ -1733,7 +2048,11 @@ function RecommendationsTab({ scan }) {
 
     try {
       const response = await fetch("/api/ai/recommendations", {
-        body: JSON.stringify({ scan, targetArchitecture }),
+        body: JSON.stringify({
+          scan,
+          targetArchitecture: selectedTarget?.name ?? "",
+          targetArchitectureId: selectedTarget?.id ?? ""
+        }),
         headers: { "Content-Type": "application/json" },
         method: "POST"
       });
@@ -1756,19 +2075,23 @@ function RecommendationsTab({ scan }) {
       <section className="ai-recommendation-panel">
         <div className="ai-recommendation-copy">
           <p className="eyebrow">Gemini Advisor</p>
-          <h2>Recomendaciones con contexto real del scan</h2>
+          <h2>Recomendaciones con contexto arquitectonico</h2>
           <p>
-            Envia metadata del proyecto, no contenido fuente largo: capas, rutas, scores, relaciones y senales.
-            Gemini propone recomendaciones y una ruta visual de arquitectura sin modificar archivos.
+            Envia metadata del proyecto, top matches del catalogo, evidencia, contradicciones, capas, rutas y scores.
+            Gemini debe responder con acciones concretas, no texto generico.
           </p>
+          <div className="ai-source-row">
+            <span className="ai-source-pill">metadata-only</span>
+            <span>{scan.architectureInsights?.primaryArchitecture?.name ?? scan.architectureInsights?.pattern?.name ?? "Arquitectura inferida"}</span>
+          </div>
         </div>
 
         <div className="ai-controls">
           <label>
             <span>Arquitectura destino</span>
-            <select value={targetArchitecture} onChange={(event) => setTargetArchitecture(event.target.value)}>
+            <select value={targetArchitectureId} onChange={(event) => setTargetArchitectureId(event.target.value)}>
               {architectureOptions.map((option) => (
-                <option key={option.id} value={option.name}>
+                <option key={getTargetValue(option)} value={getTargetValue(option)}>
                   {option.name}
                 </option>
               ))}
@@ -1801,8 +2124,15 @@ function RecommendationsTab({ scan }) {
               ))}
             </div>
           </Panel>
-          <Panel icon={<AlertTriangle size={18} />} title="Senales principales">
-            <SignalList alerts={scan.couplingAlerts ?? []} />
+          <Panel icon={<ShieldCheck size={18} />} title="Arquitectura detectada">
+            <div className="insight-stack">
+              {(scan.architectureInsights?.architectureMatches ?? []).slice(0, 4).map((match) => (
+                <article key={match.id}>
+                  <strong>{match.name}</strong>
+                  <span>Score {formatArchitectureScore(match.score)} - confianza {match.confidence}</span>
+                </article>
+              ))}
+            </div>
           </Panel>
         </section>
       )}
@@ -1818,13 +2148,17 @@ function AiUsageSummary({ advice }) {
   return (
     <section className="ai-usage-panel">
       <div>
-        <p className="eyebrow">{advice.source === "gemini" ? "Uso Gemini" : "IA pendiente"}</p>
+        <p className="eyebrow">{advice.source === "gemini" ? "Uso Gemini" : "Fallback local"}</p>
         <h2>{advice.model}</h2>
         <p>
           {advice.source === "gemini"
-            ? "Costo estimado segun tokens reportados por Gemini."
+            ? "Costo estimado segun tokens reportados por Gemini y el contexto arquitectonico enviado."
             : `Configura ${setup?.envFile ?? "server/.env"} con ${setup?.keyName ?? "GEMINI_API_KEY"} para activar respuestas reales.`}
         </p>
+        <div className="ai-source-row">
+          <span className="ai-source-pill">{advice.source === "gemini" ? "source: gemini" : "source: fallback local"}</span>
+          <span>status: {advice.status}</span>
+        </div>
       </div>
       <div className="token-meter-grid">
         <span>
@@ -1858,10 +2192,14 @@ function AiArchitectureAdvice({ advice }) {
   return (
     <section className="ai-architecture-advice">
       <div className="ai-architecture-current">
-        <p className="eyebrow">Arquitectura</p>
+        <p className="eyebrow">Arquitectura usada</p>
         <h2>{architecture.current}</h2>
         <p>{architecture.rationale}</p>
-        <span>Recomendada: {architecture.recommended}</span>
+        <div className="pattern-badges">
+          <span>confianza {architecture.confidence}</span>
+          <span>recomendada: {architecture.recommended}</span>
+          {architecture.recommendedId ? <span>{architecture.recommendedId}</span> : null}
+        </div>
       </div>
       <div className="ai-evidence-list">
         <strong>Evidencia usada</strong>
@@ -1877,6 +2215,7 @@ function AiArchitectureAdvice({ advice }) {
               <span>{phase.title}</span>
               <p>{phase.detail}</p>
               {phase.files?.length > 0 ? <em>{phase.files.join(" / ")}</em> : null}
+              {phase.risk ? <em>Riesgo: {phase.risk}</em> : null}
             </div>
           </article>
         ))}
@@ -1899,9 +2238,17 @@ function AiRecommendationList({ recommendations }) {
             <strong>{item.title}</strong>
           </div>
           <p>{item.detail}</p>
+          {item.evidence?.length > 0 ? (
+            <div className="ai-card-evidence">
+              {item.evidence.slice(0, 4).map((evidence) => (
+                <em key={evidence}>{evidence}</em>
+              ))}
+            </div>
+          ) : null}
           <footer>
             <em>Impacto: {item.impact}</em>
             <em>Esfuerzo: {item.effort}</em>
+            {item.layer ? <em>Capa: {item.layer}</em> : null}
             {item.files?.length > 0 ? <em>{item.files.slice(0, 3).join(" / ")}</em> : null}
           </footer>
         </article>
